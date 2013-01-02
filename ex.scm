@@ -584,7 +584,7 @@
 (define (nest-pair n)
   (flatmap 
     (lambda (i)
-       (map (lambda (j) (list i j))
+       (map (lambda (j) (list j i))
             (enumerate-interval 1 (- i 1))))
      (enumerate-interval 1 n)))
 
@@ -600,8 +600,221 @@
          (else (filter predicate (cdr seq)))))
 
 (define (prime-sum-pairs n)
-  (filter prime-sum?
-          (nest-pair n)))
+  (filter prime-sum?  (nest-pair n)))
+
+(define (nest-triplet n)
+  (flatmap
+    (lambda (pair)
+      (map (lambda (j) (append pair (list j)))
+           (enumerate-interval (+ 1 (max-seq pair)) n)))
+    (nest-pair (- n 1))))
+
+(define (max-seq seq)
+  ( cond ((null? (cdr (cdr seq)))
+          (max (car seq) (cadr seq)))
+         (else (max (car seq) (max-seq (cdr seq))))))
+
+(define (sum-triplet sum n)
+  (filter (lambda (seq) (= sum (accumulate + 0 seq)))
+          (nest-triplet n)))
+
+(define (nth n seq)
+  ( if (= n 1)
+       (car seq)
+       (nth (- n 1) (cdr seq))))
+
+(define (queens board-size)
+  (define (queen-cols k)
+    ( if (= k 0)
+         (list empty-board)
+         (filter
+           (lambda (positions) (safe? k positions))
+           (flatmap
+             (lambda (rest-of-queens)
+               (map (lambda (new-row)
+                      (adjoin-position new-row
+                                       k
+                                       rest-of-queens))
+                    (enumerate-interval 1 board-size)))
+             (queen-cols (- k 1))))))
+  (queen-cols board-size))
+
+(define (adjoin-position new-row k rest-of-queens)
+  (cons (list k new-row) rest-of-queens))
+
+(define (safe? k positions)
+  (let ((new-pos (car positions))
+        (others  (cdr positions)))
+    (define (safe2? others)
+      ( cond ((null? others) true)
+             (else (and (no-check? new-pos (car others))
+                        (safe2? (cdr others))))))
+    (safe2? others)))
+
+(define (no-check? p1 p2)
+  (let ((col1 (car p1))
+        (col2 (car p2))
+        (row1 (cadr p1))
+        (row2 (cadr p2)))
+    ( cond ((= row1 row2) false)
+           ((= col1 col2) false)
+           ((= (abs (- row1 row2)) (abs (- col1 col2))) false)
+           (else true))))
+
+(define (adjoin-positions new-row k rest-of-queens)
+  true)
+
+(define empty-board nil)
+
+(define (up-split painter n)
+  ( if (= n 0)
+       painter
+       (let ((new (up-split painter (- n 1))))
+         (below painter (beside new new)))))
+
+(define (below down up)
+  (compose-painters (compose-painters up
+                                       (build-painter (list "")))
+                     down))
+
+(define (beside left right)
+  (compose-painters left right))
+
+(define (build-painter symbols)
+  (lambda ()
+    (define (iter syms)
+      ( cond ((null? syms) (display ""))
+             ((equal? (car syms) "") (newline)
+                                     (iter (cdr syms)))
+             (else (display (car syms))
+                   (iter (cdr syms)))))
+    (iter symbols)))
+
+(define (compose-painters p1 p2)
+  (lambda ()
+    (p1)
+    (p2)))
+
+(define (split first second)
+  (lambda (painter n)
+    ( if (= n 0)
+         painter
+         (let ((new ((split first second) painter (- n 1))))
+             (first painter (second new new))))))
+
+(define (make-vect x y)
+  (cons x y))
+
+(define (xcor-vect vect)
+  (car vect))
+
+(define (ycor-vect vect)
+  (cdr vect))
+
+(define (add-vect v1 v2)
+  (make-vect (+ (xcor-vect v1) (xcor-vect v2))
+             (+ (ycor-vect v1) (ycor-vect v2))))
+
+(define (sub-vect v1 v2)
+  (make-vect (- (xcor-vect v1) (xcor-vect v2))
+             (- (ycor-vect v1) (ycor-vect v2))))
+
+(define (scale-vect s vect)
+  (make-vect (* s xcor-vect vect) (* s ycor-vect vect)))
+
+(define (make-frame origin edge1 edge2)
+  (list origin edge1 edge2))
+
+(define (origin-frame frame)
+  (car frame))
+
+(define (edge1-frame frame)
+  (cadr frame))
+
+(define (edge2-frame frame)
+  (cadr (cdr frame)))
+
+(define (make-frame-bis origin edge1 edge2)
+  (cons origin (cons edge1 edge2)))
+
+(define (origin-frame-bis frame)
+  (car frame))
+
+(define (edge1-frame-bis frame)
+  (cadr frame))
+
+(define (edge2-frame-bis frame)
+  (cdr (cdr frame)))
+
+(define (make-segment start-vect end-vect)
+  (cons start-vect end-vect))
+
+(define (start-segment segm)
+  (car segm))
+
+(define (end-segment segm)
+  (cdr segm))
+
+(define (segments->painter segment-list)
+  (lambda (frame)
+    (for-each
+      (lambda (segment)
+        (draw-line
+          ((frame-coord-map frame) (start-segment segment))
+          ((frame-coord-map frame) (end-segment segment))))
+      segment-list)))
+
+(define (outline-painter frame)
+  (let ((v1 (make-vect 0 0))
+        (v2 (make-vect 0 1))
+        (v3 (make-vect 1 1))
+        (v4 (make-vect 1 0))
+        (s1 (make-segment v1 v2))
+        (s2 (make-segment v2 v3))
+        (s3 (make-segment v3 v4))
+        (s4 (make-segment v4 v1)))
+    (segments->painter (list s1 s2 s3 s4))))
+
+(define (split-horiz painter)
+  (transform-painter painter
+                     (make-vect 1.0 0.0)
+                     (make-vect 0.0 0.0)
+                     (make-vect 1.0 1.0)))
+
+(define (rotate-180 painter)
+  (transform-painter painter
+                     (make-vect 1.0 1.0)
+                     (make-vect 0.0 1.0)
+                     (make-vect 1.0 0.0)))
+
+(define (below p1 p2)
+  (let ((split-point (make-vect 0.0 0.5))
+        (new-p1 (transform-painter p1
+                                   (make-vect 0.0 0.0)
+                                   (make-vect 1.0 0.0)
+                                   split-point))
+        (new-p2 (transform-painter p1
+                                   split-point
+                                   (make-vect 1.0 0.5)
+                                   (make-vect 0.0 1.0))))
+    (lambda (frame) ((new-p1 frame) (new-p2 frame)))))
+
+(define (below2 p1 p2)
+  (rotate-270 (beside (rotate-90 p1) (rotate-90 p2))))
+
+(define (corner-split painter n)
+  (if (= n 0)
+    painter
+    (beside (below painter (up-split painter (- n 1)))
+            (below (right-split painter (- n 1))
+                   (corner-split painter (- n 1))))))
+
+(define (equal2? first second)
+  ( cond ((and (pair? first)
+               (pair? second))
+          (and (equal2? (car first) (car second))
+               (equal2? (cdr first) (cdr second))))
+         (else (eq? first second))))
 
 ;Testing
 
@@ -617,10 +830,12 @@
   (display exp2)
   (newline))
 
-(let ((n 5)
-      )
-      (test-runner "prime-sum-pairs"
-                   (prime-sum-pairs n)
-                   '((2 1) (3 2) (4 1) (4 3) (5 2)) 
-                   ))
+(let ((l1 '(this is a list))
+       (l2 '(this (is a) list)))
+      (test-runner "equal2?"
+                   (equal2? l1 l1)
+                   true)
+      (test-runner "equal2?"
+                   (equal2? l1 l2)
+                   false))
 
