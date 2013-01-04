@@ -809,12 +809,124 @@
             (below (right-split painter (- n 1))
                    (corner-split painter (- n 1))))))
 
+;(display (list 'a 'b 'c))
+;(newline)
+;(display (list (list 'george)))
+;(newline)
+;(display (cdr '((x1 x2) (y1 y2))))
+;(newline)
+;(display (cadr '((x1 x2) (y1 y2))))
+;(newline)
+;(display (pair? (car '(a short list))))
+;(newline)
+;(display (memq 'red '((red shoes) (blue socks))))
+;(newline)
+;(display (memq 'red '(red shoes blue socks)))
+;(newline)
+
 (define (equal2? first second)
   ( cond ((and (pair? first)
                (pair? second))
           (and (equal2? (car first) (car second))
                (equal2? (cdr first) (cdr second))))
          (else (eq? first second))))
+
+(define (deriv exp var)
+  (cond ((number? exp) 0)
+        ((variable? exp)
+         (if (same-variable? exp var) 1 0))
+        ((sum? exp)
+         (make-sum (deriv (addend exp) var)
+                   (deriv (augend exp) var)))
+        ((product? exp)
+         (make-sum
+           (make-product (multiplier exp)
+                         (deriv (multiplicand exp) var))
+           (make-product (deriv (multiplier exp) var)
+                         (multiplicand exp))))
+        ((exponentiation? exp)
+         (make-product (exponent exp)
+                       (make-product (make-exponentiation (base exp)
+                                                          (make-sum (exponent exp) -1))
+                                     (deriv (base exp) var))))
+        (else
+          (error "unknown expression type - DERIV" exp))))
+
+(define (variable? x) (symbol? x))
+(define (same-variable? v1 v2) (and (variable? v1) (variable? v2) (eq? v1 v2)))
+(define (sum? x) (and (pair? x) (eq? (car x) '+)))
+(define (addend s) (cadr s))
+
+(define (augend s) (accumulate make-sum 0 (cddr s)))
+
+(define (product? x) (and (pair? x) (eq? (car x) '*)))
+(define (multiplier p) (cadr p))
+
+(define (multiplicand p) (accumulate make-product 1 (cddr p)))
+
+(define (=number? exp num) (and (number? exp) (= exp num)))
+
+(define (make-sum a1 a2)
+  (cond ((=number? a1 0) a2)
+        ((=number? a2 0) a1)
+        ((and (number? a1) (number? a2)) (+ a1 a2))
+        (else (list '+ a1 a2))))
+
+(define (make-product m1 m2)
+  (cond ((or (=number? m1 0) (=number? m2 0)) 0)
+        ((=number? m1 1) m2)
+        ((=number? m2 1) m1)
+        ((and (number? m1) (number? m2)) (* m1 m2))
+        (else (list '* m1 m2))))
+
+(define (exponentiation? x)
+  (and (pair? x) (eq? (car x) 'expt)))
+
+(define (base x) (cadr x))
+(define (exponent x) (caddr x))
+(define (make-exponentiation base exponent)
+  ( cond ((=number? exponent 0) 1)
+         ((=number? exponent 1) base)
+         (else (list 'expt base exponent))))
+
+;2.57
+(define (addend s) (car s))
+(define (augend s) (accumulate make-sum 0 (cddr s))) 
+(define (multiplier p) (car p))
+(define (multiplicand p) (accumulate make-sum 0 (cddr p))) 
+
+;2.58a
+(define (sum? x) (and (pair? x) (eq? (cadr x) '+)))
+(define (product? x) (and (pair? x) (eq? (cadr x) '*)))
+(define (augend s) (if (null? (cdddr s)) (caddr s) (cddr s)))
+(define (multiplicand s) (if (null? (cdddr s)) (caddr s) (cddr s)))
+
+;2.58b
+(define (addend s) (split-at-sym s 'left '+))
+(define (augend s) (split-at-sym s 'right '+))
+(define (multiplier s) (split-at-sym s 'left '*))
+(define (multiplicand s) (split-at-sym s 'right '*))
+
+(define (sum? x) (op-in? x '+))
+
+(define (product? x) (and (not (sum? x)) (op-in? x '*)))
+
+(define (op-in? x op)
+  (cond ((null? x) false)
+        ((eq? op (car x)) true)
+        (else (op-in? (cdr x) op))))
+
+(define (split-at-sym x direction sym)
+  (define (iter left right)
+    (cond ((eq? (car right) sym) (if (eq? direction 'left)
+                                   (clean-double-list left)
+                                   (clean-double-list (cdr right))))
+          (else (iter (append left (list (car right))) (cdr right)))))
+  (iter '() x))
+
+(define (clean-double-list x)
+  (cond ((and (pair? x) (null? (cdr x))) (car x))
+        (else x)))
 
 ;Testing
 
@@ -830,12 +942,18 @@
   (display exp2)
   (newline))
 
-(let ((l1 '(this is a list))
-       (l2 '(this (is a) list)))
-      (test-runner "equal2?"
-                   (equal2? l1 l1)
-                   true)
-      (test-runner "equal2?"
-                   (equal2? l1 l2)
-                   false))
-
+;(test-runner "deriv"
+             ;(deriv '(* (* x y) (+ x 3)) 'x)
+             ;'(+ (* x y) (* y (+ x 3))))
+;(test-runner "deriv"
+             ;(deriv '(* x y (+ x 3)) 'x)
+             ;'(+ (* x y) (* y (+ x 3))))
+;(test-runner "deriv"
+             ;(deriv '(expt x 2) 'x)
+             ;'(* 2 x))
+(test-runner "deriv"
+             (deriv '(x + 3 * (x + y + 2)) 'x)
+             4)
+(test-runner "deriv"
+             (deriv '(x * 3 + (x + y + 2)) 'x)
+             4)
