@@ -1,0 +1,79 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+accumulate	./2_3_3-2_5.scm	/^(define (accumulate op initial sequence)$/;"	f
+adjoin-set	./2_3_3-2_5.scm	/^(define (adjoin-set x set)$/;"	f
+adjoin-set2	./2_3_3-2_5.scm	/^(define (adjoin-set2 x set)$/;"	f
+apply-generic	./2_3_3-2_5.scm	/^(define (apply-generic op . args)$/;"	f
+attach-tag	./2_3_3-2_5.scm	/^(define (attach-tag type-tag contents)$/;"	f
+choose-branch	./2_3_3-2_5.scm	/^(define (choose-branch bit branch)$/;"	f
+cons-stream	./2_3_3-2_5.scm	/^(define-macro cons-stream$/;"	f
+contains-symbol?	./2_3_3-2_5.scm	/^(define (contains-symbol? sym sym-list)$/;"	f
+contents	./2_3_3-2_5.scm	/^(define (contents datum)$/;"	f
+decode	./2_3_3-2_5.scm	/^(define (decode bits tree)$/;"	f
+decode-2-67	./2_3_3-2_5.scm	/^(define (decode-2-67)$/;"	f
+element-of-set2?	./2_3_3-2_5.scm	/^(define (element-of-set2? x set)$/;"	f
+element-of-set?	./2_3_3-2_5.scm	/^(define (element-of-set? x set)$/;"	f
+encode	./2_3_3-2_5.scm	/^(define (encode message tree)$/;"	f
+encode-symbol	./2_3_3-2_5.scm	/^(define (encode-symbol sym tree)$/;"	f
+entry	./2_3_3-2_5.scm	/^(define (entry tree) (car tree))$/;"	f
+equ?	./2_3_3-2_5.scm	/^(define (equ? x y) (apply-generics 'equ? x y))$/;"	f
+false	./2_3_3-2_5.scm	/^(define false #f)$/;"	f
+generate-huffman-tree	./2_3_3-2_5.scm	/^(define (generate-huffman-tree pairs)$/;"	f
+hq-find-employee-record	./2_3_3-2_5.scm	/^(define (hq-find-employee-record employee division-list)$/;"	f
+hq-get-record	./2_3_3-2_5.scm	/^(define (hq-get-record employee division)$/;"	f
+hq-get-salary	./2_3_3-2_5.scm	/^(define (hq-get-salary record division)$/;"	f
+install-complex-package	./2_3_3-2_5.scm	/^(define (install-complex-package)$/;"	f
+install-deriv-package	./2_3_3-2_5.scm	/^(define (install-deriv-package)$/;"	f
+install-rational-package	./2_3_3-2_5.scm	/^(define (install-rational-package)$/;"	f
+install-scheme-number-package	./2_3_3-2_5.scm	/^(define (install-scheme-number-package)$/;"	f
+intersect-ord-list	./2_3_3-2_5.scm	/^(define (intersect-ord-list l1 l2)$/;"	f
+intersection-set	./2_3_3-2_5.scm	/^(define (intersection-set set1 set2)$/;"	f
+intersection-set-tree	./2_3_3-2_5.scm	/^(define (intersection-set-tree t1 t2)$/;"	f
+intersection-set2	./2_3_3-2_5.scm	/^(define (intersection-set2 s1 s2)$/;"	f
+kill-parallel-executors	./2_3_3-2_5.scm	/^(define (kill-parallel-executors thread-list)$/;"	f
+leaf?	./2_3_3-2_5.scm	/^(define (leaf? object)$/;"	f
+left-branch	./2_3_3-2_5.scm	/^(define (left-branch tree) (cadr tree))$/;"	f
+left-branch	./2_3_3-2_5.scm	/^(define (left-branch tree) (car tree))$/;"	f
+lookup	./2_3_3-2_5.scm	/^(define (lookup the-key db-tree)$/;"	f
+make-code-tree	./2_3_3-2_5.scm	/^(define (make-code-tree left right)$/;"	f
+make-leaf	./2_3_3-2_5.scm	/^(define (make-leaf symbol weight)$/;"	f
+make-leaf-set	./2_3_3-2_5.scm	/^(define (make-leaf-set pairs)$/;"	f
+make-serializer	./2_3_3-2_5.scm	/^(define (make-serializer)$/;"	f
+make-tree	./2_3_3-2_5.scm	/^(define (make-tree entry left right)$/;"	f
+merge-ord-lists	./2_3_3-2_5.scm	/^(define (merge-ord-lists l1 l2)$/;"	f
+nil	./2_3_3-2_5.scm	/^(define nil '())$/;"	f
+parallel-execute	./2_3_3-2_5.scm	/^(define (parallel-execute . args)$/;"	f
+random	./2_3_3-2_5.scm	/^(define (random n)$/;"	f
+right-branch	./2_3_3-2_5.scm	/^(define (right-branch tree) (caddr tree))$/;"	f
+right-branch	./2_3_3-2_5.scm	/^(define (right-branch tree) (cadr tree))$/;"	f
+runtime	./2_3_3-2_5.scm	/^(define (runtime)$/;"	f
+sample-message	./2_3_3-2_5.scm	/^(define sample-message '(0 1 1 0 0 1 0 1 0 1 1 1 0))$/;"	f
+sample-tree	./2_3_3-2_5.scm	/^(define sample-tree$/;"	f
+stream-car	./2_3_3-2_5.scm	/^(define (stream-car stream) (car stream))$/;"	f
+stream-cdr	./2_3_3-2_5.scm	/^(define (stream-cdr stream) (force (cdr stream)))$/;"	f
+stream-null?	./2_3_3-2_5.scm	/^(define (stream-null? stream) (null? stream))$/;"	f
+successive-merge	./2_3_3-2_5.scm	/^(define (successive-merge nodes)$/;"	f
+symbol-leaf	./2_3_3-2_5.scm	/^(define (symbol-leaf x) (cadr x))$/;"	f
+symbols	./2_3_3-2_5.scm	/^(define (symbols tree)$/;"	f
+test-2-59	./2_3_3-2_5.scm	/^(define (test-2-59) $/;"	f
+test-2-61	./2_3_3-2_5.scm	/^(define (test-2-61)$/;"	f
+test-2-62	./2_3_3-2_5.scm	/^(define (test-2-62)$/;"	f
+test-2-63	./2_3_3-2_5.scm	/^(define (test-2-63)$/;"	f
+test-2-68	./2_3_3-2_5.scm	/^(define (test-2-68)$/;"	f
+test-2-69	./2_3_3-2_5.scm	/^(define (test-2-69)$/;"	f
+test-2-70	./2_3_3-2_5.scm	/^(define (test-2-70)$/;"	f
+test-runner	./2_3_3-2_5.scm	/^(define (test-runner name exps)$/;"	f
+the-empty-stream	./2_3_3-2_5.scm	/^(define the-empty-stream '())$/;"	f
+tree->list-1	./2_3_3-2_5.scm	/^(define (tree->list-1 tree)$/;"	f
+tree->list-2	./2_3_3-2_5.scm	/^(define (tree->list-2 tree)$/;"	f
+true	./2_3_3-2_5.scm	/^(define true #t)$/;"	f
+type	./2_3_3-2_5.scm	/^(define (type datum)$/;"	f
+union-set	./2_3_3-2_5.scm	/^(define (union-set set1 set2)$/;"	f
+union-set-tree	./2_3_3-2_5.scm	/^(define (union-set-tree t1 t2)$/;"	f
+union-set2	./2_3_3-2_5.scm	/^(define (union-set2 s1 s2)$/;"	f
+weight	./2_3_3-2_5.scm	/^(define (weight tree)$/;"	f
+weight-leaf	./2_3_3-2_5.scm	/^(define (weight-leaf x) (caddr x))$/;"	f

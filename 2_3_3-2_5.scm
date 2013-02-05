@@ -71,10 +71,13 @@
   (iter exps 0))
 
 
-;(test-runner "deriv"
-             ;(deriv '(* (* x y) (+ x 3)) 'x)
-             ;'(+ (* x y) (* y (+ x 3))))
+; other funcs
 
+(define (accumulate op initial sequence)
+  (if (null? sequence)
+    initial
+    (op (car sequence)
+        (accumulate op initial (cdr sequence)))))
 
 ;;;     Section 2.3.3
 
@@ -373,3 +376,177 @@
     (display (* (/ (log (length pairs)) (log 2)) (length mex)))
     (newline)))
 
+; 2.73 b/c
+
+(define (install-deriv-package)
+
+  ;; internal procedures
+  (define (deriv-sum exp var)
+    (make-sum (deriv (addend exp) var)
+              (deriv (augend exp) var)))
+  (define (make-sum a1 a2)
+    (cond ((=number? a1 0) a2)
+          ((=number? a2 0) a1)
+          ((and (number? a1) (number? a2)) (+ a1 a2))
+          (else (list '+ a1 a2))))
+  (define (addend s) (cadr s))
+  (define (augend s) (accumulate make-sum 0 (cddr s)))
+  (define (=number? exp num) (and (number? exp) (= exp num)))
+
+  (define (deriv-prod exp var)
+    (make-sum
+      (make-product (multiplier exp)
+                    (deriv (multiplicand exp) var))
+      (make-product (deriv (multiplier exp) var)
+                    (multiplicand exp))))
+  (define (make-product m1 m2)
+    (cond ((or (=number? m1 0) (=number? m2 0)) 0)
+          ((=number? m1 1) m2)
+          ((=number? m2 1) m1)
+          ((and (number? m1) (number? m2)) (* m1 m2))
+          (else (list '* m1 m2))))
+  (define (multiplier p) (cadr p))
+  (define (multiplicand p) (accumulate make-product 1 (cddr p)))
+
+  (define (deriv-expt exp var)
+    (make-product (exponent exp)
+                  (make-product (make-exponentiation (base exp)
+                                                     (make-sum (exponent exp) -1))
+                                (deriv (base exp) var))))
+  (define (make-exponentiation base exponent)
+    ( cond ((=number? exponent 0) 1)
+           ((=number? exponent 1) base)
+           (else (list 'expt base exponent))))
+  (define (base x) (cadr x))
+  (define (exponent x) (caddr x))
+
+  ;; installation
+  (put 'deriv '+ deriv-sum)
+  (put 'deriv '* deriv-product)
+  (put 'deriv 'expt deriv-expt)
+  'done)
+
+; 2.74
+
+(define (hq-get-record employee division)
+  ((get 'get-employee-record division) employee))
+
+(define (hq-get-salary record division)
+  ((get 'get-salary division) employee))
+
+(define (hq-find-employee-record employee division-list)
+  (if (null? division-list)
+    false
+    (or (hq-get-record employee (car division-list))
+        (find-employee-record employee (cdr division-list)))))
+
+; 2.78
+
+(define (type datum)
+  (cond ((number? datum) 'scheme-number)
+        ((pair? datum) (car datum))
+        (else (error "Bad tagged datum - TYPE-TAG" datum))))
+
+(define (contents datum)
+  (cond ((number? datum) datum)
+        ((pair? datum) (cdr datum))
+        (else (error "Bad tagged datum - CONTENTS" datum))))
+
+(define (attach-tag type-tag contents)
+  (if (eq? type-tag 'scheme-number) contents
+    (cons type-tag contents)))
+
+;2.79
+
+(define (install-scheme-number-package)
+  ;...
+  (put 'equ? '(scheme-number scheme-number) =)
+  'done)
+
+(define (install-rational-package)
+  ;...
+  (define (equ-rat? rat1 rat2) (= (* (numer rat1) (denom rat2)) (* (numer rat2) (denom rat1))))
+  ;...
+  (put 'equ? '(rational rational) equ-rat?)
+  'done)
+
+(define (install-complex-package)
+  ;...
+  (define (equ-img? i1 i2) (and (= (real-part i1) (real-part i2)) (= (imag-part i1) (imag-part i2))))
+  ;...
+  (put 'equ? '(complex complex) equ-img?)
+  'done)
+
+(define (equ? x y) (apply-generic 'equ? x y))
+
+; 2.82
+
+(define (all-true args)
+  (cond ((null? args) false)
+        ((null? (cdr args)) (and (car args) true))
+        (else (and (car args) (all-true (cdr args))))))
+
+(define (maplist funcs args)
+  (let ((f? (null? funcs)) (a? (null? args)))
+    (cond ((and f? a?) nil)
+          ((or (and f? (not a?)) (and a? (not f?))) (error "different lenght args for maplist"))
+          (else (cons ((car funcs) (car args)) (maplist (cdr funcs) (cdr args)))))))
+
+(define (apply-generic op . args)
+
+  (define (iter-on-types types-to-try type-tags)
+    (if (null? types-to-try) (error "No method for these types" (list op type-tags))
+      (let ((try-type (car types-to-try)))
+        (let ((coerce-funcs (map (lambda (x) (if (eq? x try-type)
+                                               (lambda (x) x)
+                                               (get-coercion x try-type)))
+                                 type-tags)))
+          (if (all-true coerce-funcs)
+            (let ((proc (get op (map (lambda (x) try-type) type-tags))))
+              (if proc (apply proc (map contents (maplist coerce-funcs args)))
+                (iter-on-types (cdr types-to-try) type-tags)))
+            (iter-on-types (cdr types-to-try) type-tags))))))
+
+  (let ((type-tags (map type-tag args)))
+    (let ((proc (get op type-tags)))
+      (if proc
+        (apply proc (map contents args))
+        (if (> (length args) 1)
+          (iter-on-types type-tags type-tags)
+          (error "No method for this type"
+                 (list op type-tags)))))))
+
+; creating test stubs
+(define (type-tag x) (car x))
+(define (contents x) (cdr x))
+(define (get-coercion x y)
+  (if (and (eq? 'mammal y) (or (eq? x 'dog) (eq? x 'cat) (eq? x 'horse)))
+    (lambda (x) (list 'mammal (cadr x)))
+    false))
+(define (get op types)
+  (cond ((and (eq? op mammal-love) (all-true (map (lambda (x) (eq? 'mammal x)) types)))
+         mammal-love)
+        ((and (eq? op mammal-fish-love)
+              (all-true (map (lambda (x) (or (eq? 'mammal x) (eq? 'fish x))) types)))
+         mammal-fish-love)
+        (else false)))
+(define (mammal-love . mammals)
+  (define (iter mammals)
+    (if (null? mammals) (list "the end !")
+      (append (list (caar mammals) "loves") (iter (cdr mammals)))))
+  (iter mammals))
+(define mammal-fish-love mammal-love)
+(define adog '(dog "a dog"))
+(define acat '(cat "a cat"))
+(define ahorse '(mammal "a horse"))
+(define afish '(fish "a fish"))
+
+(define (test-2.82)
+  (test-runner "apply-generic"
+               '((apply-generic mammal-love adog acat ahorse)
+                 ("a dog" "loves" "a cat" "loves" "a horse" "loves" "the end !"))))
+; example of failure that should work
+(apply-generic mammal-fish-love adog acat afish)
+
+; i can't force myself to complete the next few exercises, it's boring to death
+; i'll move to chapter 3, i'm doing this for fun after all, dude!
