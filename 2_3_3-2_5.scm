@@ -445,12 +445,12 @@
 (define (type datum)
   (cond ((number? datum) 'scheme-number)
         ((pair? datum) (car datum))
-        (else (error "Bad tagged datum - TYPE-TAG" datum))))
+        (else (error "Bad tagged datum - type-tag" datum))))
 
 (define (contents datum)
   (cond ((number? datum) datum)
         ((pair? datum) (cdr datum))
-        (else (error "Bad tagged datum - CONTENTS" datum))))
+        (else (error "Bad tagged datum - contents" datum))))
 
 (define (attach-tag type-tag contents)
   (if (eq? type-tag 'scheme-number) contents
@@ -546,7 +546,166 @@
                '((apply-generic mammal-love adog acat ahorse)
                  ("a dog" "loves" "a cat" "loves" "a horse" "loves" "the end !"))))
 ; example of failure that should work
-(apply-generic mammal-fish-love adog acat afish)
+(define (failed-test-2.82)
+  (apply-generic mammal-fish-love adog acat afish))
 
-; i can't force myself to complete the next few exercises, it's boring to death
-; i'll move to chapter 3, i'm doing this for fun after all, dude!
+; 2.83
+
+(define (install-int-package)
+  ;...
+  (define (raise-int int)
+    (make-rational int 1))
+  (put 'raise 'int raise-int)
+  'done)
+
+(define (install-rat-package)
+  ;...
+  (define (raise-rat rat)
+    (make-real (/ (numer rat) (denom rat))))
+  (put 'raise 'rat raise-rat)
+  'done)
+
+(define (install-real-package)
+  ;...
+  (define (raise-real real)
+    (make-complex-from-real-imag real 0))
+  (put 'raise 'real raise-real)
+  'done)
+
+; 2.84
+(define (apply-generic op . args)
+  (let ((type-tags (map type-tag args)))
+    (let ((proc (get op type-tags)))
+      (if proc
+        (apply proc (map contents args))
+        (if (> (length args) 1)
+          (let ((raised-args (raise-to-common args)))
+            (if raised-args
+              (let ((proc (get op (map type-tag raised-args))))
+                (if proc
+                  (apply proc (map contents raised-args))
+                  (error "No method for these types" (list op type-tags))))
+              (error "No method for these types" (list op type-tags))))
+          (error "No method for this type" (list op type-tags)))))))
+
+(define (raise-to-common args)
+    (let ((raised-args (map (lambda (x) (raise-to-type (top-type-of args) x)) args)))
+      (if (all-true raised-args) raised-args
+        false)))
+
+(define (raise-to-type type item)
+  (let ((item-type (type-tag item)))
+    (if (eq? item-type type) item
+        (let ((raise-fn (get-raise item-type)))
+          (if raise-fn (raise-to-type type (raise-fn item))
+            false)))))
+
+(define (top-type-of args)
+  (if (null? (cdr args)) (type-tag (car args))
+    (let ((t1 (type-tag (car args)))
+          (t2 (top-type-of (cdr args))))
+      (let ((l1 (get-level t1)) (l2 (get-level t2)))
+        (if (> l1 l2) t1 t2)))))
+
+; creating test stubs
+(define aint '(int 3))
+(define arat '(rat 5 8))
+(define areal '(real 3.5))
+(define acomplex '(complex 10 5))
+(define (get-raise type)
+  (cond ((eq? type 'int) (lambda (int) (list 'rat (cadr int) 1)))
+        ((eq? type 'rat) (lambda (rat) (list 'real (/ (cadr rat) (caddr rat)))))
+        ((eq? type 'real) (lambda (real) (list 'complex (cadr real) 0)))
+        (else false)))
+(define (get op types)
+  (if (and (eq? op 'sum-nums) (all-true (map (lambda (x) (eq? x 'complex)) types)))
+    sum-complex
+    false))
+(define (sum-complex . nums)
+  ;(nums))
+  (define (sum-2-complex i1 i2)
+    (list (+ (car i1) (car i2)) (+ (cadr i1) (cadr i2))))
+  (append '(complex) (accumulate sum-2-complex '(0 0) nums)))
+(define (get-level type)
+  (cond ((eq? type 'int) 1)
+        ((eq? type 'rat) 2)
+        ((eq? type 'real) 3)
+        ((eq? type 'complex) 4)
+        (else (error "no level for type" type))))
+
+(define (test-2.84)
+  (test-runner "apply-generic" '(
+    (apply-generic 'sum-nums aint arat areal acomplex)
+    (complex 17.125 5))))
+
+; 2.85
+
+; install-complex-package...
+(define (project-complex imag)
+  (make-real (real-part imag)))
+; (put-project 'complex project-complex)
+
+; install-real-package
+(define (project-real num)
+  (define (find-denom n d)
+    (if (integer? (* n d)) d
+      (find-denom n (* d 10))))
+  (let ((real (car num)))
+    (let ((denom (find-denom real 1)))
+      (make-rational (inexact->exact (* real denom)) denom))))
+; put-project...
+
+; install-rational-package....
+(define (project-rat rat)
+  (make-int (inexact->exact (round (/ (numer rat) (denom rat))))))
+; put-project...
+
+(define (project arg)
+  (let ((fn (get-project (type-tag arg))))
+    (if fn (fn (contents arg)) false)))
+
+(define (drop arg)
+  (let ((projected (project arg)))
+    (if (and projected (equ? arg ((get-raise (type-tag projected)) projected))) (drop projected)
+      arg)))
+
+(define (new-apply-generic op . args)
+  (drop (apply apply-generic op args)))
+
+; test stubs
+(define (make-rational n d)
+  (let ((div (gcd n d)))
+    (list 'rat (/ n div) (/ d div))))
+(define (make-real r)
+  (list 'real r))
+(define (make-int i)
+  (list 'int i))
+(define (get-project type)
+  (cond ((eq? type 'complex) project-complex)
+        ((eq? type 'real) project-real)
+        ((eq? type 'rat) project-rat)
+        (else false)))
+(define (equ? x y)
+  (let ((tx (type-tag x)) (ty (type-tag y)) (cx (contents x)) (cy (contents y)))
+    (cond ((not (eq? tx ty)) false)
+          ((eq? tx 'int) (= (car cx) (car cy)))
+          ((eq? tx 'rat) (= (* (numer cx) (denom cy)) (* (numer cy) (denom cx))))
+          ((eq? tx 'real) (= (car cx) (car cy)))
+          ((eq? tx 'complex) (and (= (real-part cx) (real-part cy)) (= (imag-part cx) (imag-part cy))))
+          (else (error "unknown type" tx)))))
+(define (numer rat) (car rat))
+(define (denom rat) (cadr rat))
+(define (real-part imag) (car imag))
+(define (imag-part imag) (cadr imag))
+
+(define (test-2.85)
+  (test-runner "new-apply-generic"
+               '((new-apply-generic 'sum-nums (make-int 5) (make-rational 5 2)
+                                    (make-real 7.5) (list 'complex 10 0))
+                 (int 25)
+                 (new-apply-generic 'sum-nums (make-int 5) (make-rational 5 2)
+                                    (make-real 8) (list 'complex 10 0))
+                 (rat 51 2))))
+
+; i can't force myself to complete the next few exercises of this chapter, it's
+; boring to death i'll move to chapter 3, i'm doing this for fun after all, dude!
