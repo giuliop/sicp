@@ -207,3 +207,67 @@
                (rand 'generate)
                (begin (rand 'generate) (rand 'generate) (rand 'generate)
                       ((rand 'reset) random-init) (rand 'generate))))
+
+; 3.7
+
+(define (make-joint acc-name password new-password)
+  ((acc-name password 'add-joint) new-password))
+
+(define (make-account balance . passwords)
+  (define wrong-tries 0)
+  (define (withdraw amount)
+    (if (>= balance amount)
+      (begin (set! balance (- balance amount))
+             balance)
+      "Insufficient funds"))
+  (define (deposit amount)
+    (set! balance (+ balance amount))
+    balance)
+  (define (add-joint new-password)
+    (set! passwords (append passwords (list new-password)))
+    dispatch)
+  (define (dispatch user-password m)
+    (if (not (contains? user-password passwords))
+      (begin (set! wrong-tries (+ wrong-tries 1))
+               (if (< wrong-tries 7) "Incorrect password"
+                 "Cops called!"))
+      (cond ((eq? m 'withdraw) withdraw)
+            ((eq? m 'deposit) deposit)
+            ((eq? m 'add-joint) add-joint)
+            (else (error "Unknown request - MAKE-ACCOUNT"
+                         m)))))
+  dispatch)
+
+(define (contains? elem container)
+  (cond ((null? container) false)
+        ((eq? elem (car container)) true)
+        (else (contains? elem (cdr container)))))
+
+(define (test-3-7)
+  (let ((peter-acc (make-account 100 'peterpass)))
+    (let ((paul-acc (make-joint peter-acc 'peterpass 'paulpass)))
+      (test-runner "make-joint"
+                 ((paul-acc 'paulpass 'withdraw) 20)
+                 80
+                 ((peter-acc 'peterpass 'withdraw) 10)
+                 70))))
+
+; 3.8
+
+(define f
+  (let ((zero false))
+    (lambda (x)
+      (let ((res (if zero 0 x)))
+        (cond ((= x 0) (begin (set! zero true) res))
+              (else (begin (set! zero false) res)))))))
+
+(define (test-3-8)
+  (test-runner "f"
+               (let ((a1 (f 0))
+                     (a2 (f 1)))
+                 (+ a1 a2))
+               0
+               (let ((a1 (f 1))
+                     (a2 (f 0)))
+                 (+ a1 a2))
+               1))
