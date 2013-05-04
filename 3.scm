@@ -271,3 +271,119 @@
                      (a2 (f 0)))
                  (+ a1 a2))
                1))
+
+; 3.14
+
+(define (mystery x)
+  (define (loop x y)
+    (if (null? x)
+      y
+      (let ((temp (cdr x)))
+        (set-cdr! x y)
+        (loop temp x))))
+  (loop x '()))
+
+; 3.16
+
+(define (count-pairs x)
+  (if (not (pair? x))
+    0
+    (+ (count-pairs (car x))
+       (count-pairs (cdr x))
+       1)))
+
+(define x13 (cons 'c nil))
+(define x12 (cons 'b x13))
+(define x1 (cons 'a x12))
+
+(define x23 (cons 'a nil))
+(define x22 (cons x23 nil))
+(define x2 (cons x23 x22))
+
+(define x33 (cons 'a nil))
+(define x32 (cons x33 x33))
+(define x3 (cons x32 x32))
+
+(define x43 (cons 'b nil))
+(define x42 (cons 'a x43))
+(define x4 (cons x42 nil))
+(set-cdr! x4 x4)
+
+(define (test-3-16)
+  (test-runner "count-pairs"
+               (count-pairs x1) 3
+               (count-pairs x2) 4
+               (count-pairs x3) 7
+               ; (count-pairs x4) -> infinite recursion
+               ))
+
+; 3.17
+
+(define (count-pairs x)
+  (define visited nil)
+  (define (iter x)
+    (if (or (not (pair? x)) (contains? x visited))
+      0
+      (begin
+        (set! visited (cons x visited))
+        (+ (iter (car x))
+           (iter (cdr x))
+           1))))
+  (iter x))
+
+(define (test-3-17)
+  (test-runner "count-pairs"
+               (count-pairs x1) 3
+               (count-pairs x2) 3
+               (count-pairs x3) 3
+               (count-pairs x4) 3))
+
+; 3.18
+
+(define (cycle? x)
+  (define visited nil)
+  (define (iter x)
+    (set! visited (cons x visited))
+    (cond ((null? (cdr x)) false)
+          ((memq (cdr x) visited) true)
+          (else (iter (cdr x)))))
+  (iter x))
+
+(define (test-3-18)
+  (define x1 '(a b c))
+  (define x2 '(a b c))
+  (set-cdr! x2 x2)
+  (let ((x3 (cons x1 x2)))
+    (test-runner "cycle?"
+                 (cycle? x1) false
+                 (cycle? x2) true
+                 (cycle? x3) true)))
+
+; 3.19
+
+(define (cycle?-const-space x)
+  (define (iter x cont elem num)
+    (cond ((null? (cdr x)) false)
+          ((eq? x elem) true)
+          (else (if (= cont num)
+                  (iter (cdr x) 0 x (+ 1 num))
+                  (iter (cdr x) (+ cont 1) elem num)))))
+  (iter x 0 nil 0))
+
+(define (last-pair x)
+  (if (null? (cdr x))
+    x
+    (last-pair (cdr x))))
+
+(define x1 '(a b c))
+(define x2 '(a b c))
+(set-cdr! (last-pair x2) x2)
+(define x3 '(1 2 3 4 5 6 7 8 9 10 1 2 3 4 5 6 7 8 9 20))
+(define x4 '(a 1 2 3 4 5 6 7 8 9 10 1 2 3 4 15))
+(set-cdr! (last-pair x4) x4)
+(define x5 (append x3 x4))
+(define (test-3-19)
+  (test-runner "cycle?-const-space"
+               (cycle?-const-space x1) false
+               (cycle?-const-space x2) true
+               (cycle?-const-space x5) true))
