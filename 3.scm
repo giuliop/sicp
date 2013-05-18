@@ -555,3 +555,111 @@
                  (rear-delete-deque x) 'ignore
                  (empty-deque? x) #t
                  )))
+
+; 3.24
+
+(define (assoc testFn key records)
+  (cond ((null? records) false)
+        ((testFn key (caar records)) (car records))
+        (else (assoc testFn key (cdr records)))))
+
+(define (make-table testFn)
+  (let ((local-table (list '*table*)))
+    (define (lookup key-1 key-2)
+      (let ((subtable (assoc testFn key-1 (cdr local-table))))
+        (if subtable
+          (let ((record (assoc testFn key-2 (cdr subtable))))
+            (if record
+              (cdr record)
+              false))
+          false)))
+    (define (insert! key-1 key-2 value)
+      (let ((subtable (assoc testFn key-1 (cdr local-table))))
+        (if subtable
+          (let ((record (assoc testFn key-2 (cdr subtable))))
+            (if record
+              (set-cdr! record value)
+              (set-cdr! subtable
+                        (cons (cons key-2 value)
+                              (cdr subtable)))))
+          (set-cdr! local-table
+                    (cons (list key-1
+                                (cons key-2 value))
+                          (cdr local-table)))))
+      'ok)
+    (define (dispatch m)
+      (cond ((eq? m 'lookup-proc) lookup)
+            ((eq? m 'insert-proc!) insert!)
+            (else (error "Unknown operation - TABLE" m))))
+    dispatch))
+
+; 3.25
+
+(define (make-table testFn)
+  (let ((local-table (list '*table*)))
+    (define (lookup keys)
+      (define (iter subtable keys)
+        (if (null? (cdr keys))
+          (let ((record (assoc testFn (car keys) (cdr subtable))))
+            (if record
+              (cdr record)
+              false))
+          (let ((new-subtable (assoc testFn (car keys) (cdr subtable))))
+            (if new-subtable
+              (iter new-subtable (cdr keys))
+              false))))
+      (iter local-table keys))
+    (define (insert! keys value)
+      (define (create-subtables table keys)
+        (cond ((null? (cddr keys))
+               (set-cdr! table
+                         (cons (list (car keys)
+                                     (cons (cadr keys) value))
+                               (cdr table))))
+              (else (let ((x (list (car keys))))
+                      (set-cdr! table (cons x (cdr table)))
+                      (create-subtables x (cdr keys))))))
+      (define (iter subtable keys)
+        (if (null? (cdr keys))
+          (let ((record (assoc testFn (car keys) (cdr subtable))))
+            (if record
+              (set-cdr! record value)
+              (set-cdr! subtable
+                        (cons (cons (car keys) value)
+                              (cdr subtable)))))
+          (let ((new-subtable (assoc testFn (car keys) (cdr subtable))))
+            (if new-subtable
+              (iter new-subtable (cdr keys))
+              (create-subtables subtable keys)))))
+      (iter local-table keys)
+      'ok)
+    (define (print)
+      local-table)
+    (define (dispatch m)
+      (cond ((eq? m 'lookup-proc) lookup)
+            ((eq? m 'insert-proc!) insert!)
+            ((eq? m 'print) print)
+            (error "Unknown operation - TABLE" m)))
+    dispatch))
+
+(define operation-table (make-table equal?))
+(define get (operation-table 'lookup-proc))
+(define put (operation-table 'insert-proc!))
+(define print-table (operation-table 'print))
+
+(define (test-3-25)
+  (test-runner "make-table"
+               (get '(a b)) false
+               (put '(a b) 1) 'ok
+               (get '(a b)) 1
+               (get '(d b c)) false
+               (put '(d b c) 1) 'ok
+               (get '(d b c)) 1
+               (put '(name) 'dude) 'ok
+               (get '(name)) 'dude
+               (get '(pupo popo pepe papo)) false
+               (put '(pupo popo pepe papo) 3) 'ok
+               (get '(pupo popo pepe papo)) 3
+               (put '(pupo popo pepe papo) 5) 'ok
+               (get '(pupo popo pepe papo)) 5
+               ))
