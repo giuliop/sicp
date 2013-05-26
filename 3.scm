@@ -762,3 +762,107 @@
                (get '(5 7 4 5)) 5
                (print-table) 'ignore
                ))
+
+; 3.28
+
+(define (or-gate a1 a2 output)
+  (define (or-action-procedure)
+    (let ((new-value
+            (logical-or(get-signal a1) (get-signal a2))))
+      (after-delay or-gate-delay
+                   (lambda ()
+                     (set-signal! output new-value)))))
+  (add-action! a1 or-action-procedure)
+  (add-action! a2 or-action-procedure)
+  'ok)
+
+; 3.29
+
+(define (or-gate-combo a1 a2 output)
+  (let ((not-a1 (make-wire))
+        (not-a2 (make-wire))
+        (and-not-a1-not-a2 (make-wire)))
+    (inverter a1 not-a1)
+    (inverter a2 not-a2)
+    (and-gate not-a1 not-a2 and-not-a1-not-a2)
+    (inverter and-not-a1-not-a2 output)
+    'ok))
+
+; delay(or-gate-combo) = delay(not) + delay(and) + delay(not)
+
+; 3.30
+
+(define (ripple-carry-adder a b s c)
+  (let ((cn (make-wire)))
+    (set-signal! cn 0)
+    (define (iter a b s c-in)
+      (cond ((null? (cdr a)) (full-adder (car a) (car b) c-in (car s) cn))
+            (else (let ((c-out (make-wire)))
+                    (full-adder (car a) (car b) c-in (car s) c-out)
+                    (iter (cdr a) (cdr b) (cdr s) c-out)))))
+    (iter a b s c)
+    'ok))
+
+; delay(ripple-carry-adder) = n * delay(full-adder) = n * (2 * delay(half-adder) + delay(or)) =
+; = n * (2 * ( max (delay(or), delay(and)+delay(not) ) + delay(and) ) + delay(or))
+
+; 3.33
+(define (avereger a b c)
+  (let ((a+b (make-connector))
+        (two (make-connector)))
+    (adder a b a+b)
+    (constant 2 two)
+    (multiplier c two a+b)
+    'ok))
+
+; 3.35
+(define (squarer a b)
+  (define (process-new-value)
+    (if (has-value? b)
+      (if (< (get-value b) 0)
+        (error "square less than 0 - SQUARER"
+               (get-value b))
+        (set-value! a (sqrt (get-value b)) me))
+      (if (has-value? a)
+        (set-value! b (square (get-value a)) me))))
+  (define (process-forget-value)
+    (forget-value! a me)
+    (forget-value! b me)
+    (process-new-value))
+  (define (me request)
+    (cond ((eq? request 'I-have-a-value)
+           (process-new-value))
+          ((eq? request 'I-lost-my-value)
+           (process-forget-value))
+          (else
+            (error "Unknown request - SQUARER" request))))
+  (connect a me)
+  (connect b me)
+  me)
+
+; 3.37
+
+(define (c+ x y)
+  (let ((z (make-connector)))
+    (adder x y z)
+    z))
+
+(define (c- x y)
+  (let (( z (make-connector)))
+    (adder y z x)
+    z))
+
+(define (c* x y)
+  (let (( z (make-connector)))
+    (multiplier x y z)
+    z))
+
+(define (c/ x y)
+  (let (( z (make-connector)))
+    (multiplier y z x)
+    z))
+
+(define (cv x)
+  (let (( z (make-connector)))
+    (constant x z)
+    z))
