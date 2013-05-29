@@ -866,3 +866,44 @@
   (let (( z (make-connector)))
     (constant x z)
     z))
+
+; 3.38
+
+;a 1. 45; 2. 35; 3. 40; 4. 50
+;b 110 (peter reads 100, paul and mary complete operation, peter sets balance 110
+
+;3.40
+
+; no serialization: 10^6, 10^5, 10^4, 10^3, 10^2
+; serialized: 10^6
+
+;3.47
+
+(define (make-semaphore n)
+  (let ((taken 0)
+        (m make-mutex))
+    (define (the-semaphore op)
+      (m 'acquire)
+      (cond ((eq? op 'acquire) (if (< taken n) (set! taken (+ taken 1))
+                                 (the-semaphore 'acquire)))
+            ((eq? op 'release) (set! taken (- taken 1))))
+      (m 'release))
+    the-semaphore))
+
+;3.48
+
+(define (serialized-exchange account1 account2)
+  (cond ((< (get-id account1) (get-id account2))
+         (define acc1 account1) (define acc2 account2))
+        (else (define acc1 account2) (define acc2 account1)))
+  (let ((serializer1 (acc1 'serializer))
+        (serializer2 (acc2 'serializer)))
+    ((serializer1 (serializer2 exchange))
+     account1
+     account2)))
+
+;3;49
+
+
+
+
