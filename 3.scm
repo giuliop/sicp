@@ -794,12 +794,12 @@
 
 (define (ripple-carry-adder a b s c)
   (let ((cn (make-wire)))
-    (set-signal! cn 0)
     (define (iter a b s c-in)
       (cond ((null? (cdr a)) (full-adder (car a) (car b) c-in (car s) cn))
             (else (let ((c-out (make-wire)))
                     (full-adder (car a) (car b) c-in (car s) c-out)
                     (iter (cdr a) (cdr b) (cdr s) c-out)))))
+    (set-signal! cn 0)
     (iter a b s c)
     'ok))
 
@@ -893,17 +893,284 @@
 ;3.48
 
 (define (serialized-exchange account1 account2)
-  (cond ((< (get-id account1) (get-id account2))
-         (define acc1 account1) (define acc2 account2))
-        (else (define acc1 account2) (define acc2 account1)))
-  (let ((serializer1 (acc1 'serializer))
-        (serializer2 (acc2 'serializer)))
-    ((serializer1 (serializer2 exchange))
-     account1
-     account2)))
+  (let ((serializer1 'serializer-for-bigger-id--acc)
+        (serializer2 'serializer-for-smaller-id-acc))
+    (cond ((> (get-id account1) (get-id account2))
+           (set! serializer1 (account1 'serializer))
+           (set! serializer2 (account2 'serializer)))
+          (else (set! serializer1 (account2 'serializer))
+                (set! serializer2 (account1 'serializer))))
+    ((serializer1 (serializer2 exchange)) account1 account2)))
 
-;3;49
+; stream procs
 
+(define (stream-enumerate-interval low high)
+  (if (> low high)
+    the-empty-stream
+    (cons-stream
+      low
+      (stream-enumerate-interval (+ low 1) high))))
 
+(define (stream-filter pred stream)
+  (cond ((stream-null? stream) the-empty-stream)
+        ((pred (stream-car stream))
+         (cons-stream (stream-car stream)
+                      (stream-filter pred
+                                     (stream-cdr stream))))
+        (else (stream-filter pred (stream-cdr stream)))))
 
+(define (stream-ref s n)
+  (if (= n 0)
+    (stream-car s)
+    (stream-ref (stream-cdr s) (- n 1))))
 
+(define (stream-for-each proc s)
+  (if (stream-null? s)
+    'done
+    (begin (proc (stream-car s))
+           (stream-for-each proc (stream-cdr s)))))
+
+(define (display-stream s)
+  (stream-for-each display-line s))
+
+(define (display-line x)
+  (newline)
+  (display x))
+
+;3.50
+
+(define (stream-map proc . argstreams)
+  (if (stream-null? (car argstreams))
+    the-empty-stream
+    (cons-stream
+      (apply proc (map stream-car argstreams))
+      (apply stream-map
+             (cons proc (map stream-cdr argstreams))))))
+
+;3.51
+
+(define (show x)
+  (display-line x)
+  x)
+
+;3.53
+
+;1 2 4 8 16 32...
+(define (add-streams s1 s2) (stream-map + s1 s2))
+
+(define s (cons-stream 1 (add-streams s s)))
+
+(define (test-3-53)
+  (test-runner "s"
+               (stream-ref s 5) 32
+               ))
+
+;3.54
+
+(define (integers-starting-from n)
+  (cons-stream n (integers-starting-from (+ n 1))))
+
+(define integers (integers-starting-from 1))
+
+(define (mul-streams s1 s2) (stream-map * s1 s2))
+
+(define factorials (cons-stream 1
+                                (mul-streams (integers-starting-from 2)
+                                             factorials)))
+
+(define (test-3-54)
+  (test-runner "factorials"
+               (stream-ref factorials 4) 120
+               ))
+
+;3.55
+
+(define (partial-sum s)
+  (define partial
+    (cons-stream (stream-car s)
+                 (add-streams (stream-cdr s)
+                              partial)))
+  partial)
+
+(define (partial-sum-2 s)
+  (cons-stream (stream-car s)
+               (add-streams (stream-cdr s)
+                            (partial-sum s))))
+
+(define (test-3-55)
+  (test-runner "partial-sum"
+               (stream-ref (partial-sum integers) 4) 15
+               ))
+
+;3.56
+
+(define (scale-stream stream factor)
+  (stream-map (lambda (x) (* x factor)) stream))
+
+(define (merge s1 s2)
+  (cond ((stream-null? s1) s2)
+        ((stream-null? s2) s1)
+        (else
+          (let ((s1car (stream-car s1))
+                (s2car (stream-car s2)))
+            (cond ((< s1car s2car)
+                   (cons-stream
+                     s1car
+                     (merge (stream-cdr s1) s2)))
+                  ((> s1car s2car)
+                   (cons-stream
+                     s2car
+                     (merge s1 (stream-cdr s2))))
+                  (else
+                    (cons-stream
+                      s1car
+                      (merge (stream-cdr s1)
+                             (stream-cdr s2)))))))))
+
+(define S (cons-stream 1 (merge (scale-stream S 2)
+                                (merge (scale-stream S 3) (scale-stream S 5)))))
+
+(define (test-3-56)
+  (test-runner "S"
+               (stream-ref S 10) 15
+               ))
+
+;3.57
+
+(define fibs
+  (cons-stream 0 (cons-stream 1 (add-streams
+                                  (stream-cdr fibs)
+                                  fibs))))
+
+;3;58
+
+(define (expand num den radix)
+  (cons-stream
+    (quotient (* num radix) den)
+    (expand (remainder (* num radix) den) den radix)))
+
+(define (show-stream s elem1 elem2)
+  (define (iter elem)
+    (cond ((> elem elem2) (display ")") (newline))
+          (else (display (stream-ref s elem))
+                (display " ")
+                (iter (+ elem 1)))))
+  (display "( ")
+  (iter elem1))
+
+;3.59 - 3.62
+; too much math heavy, don't have the patience to refresh the math
+
+(define (pi-summands n)
+  (cons-stream (/ 1 n)
+               (stream-map - (pi-summands (+ n 2)))))
+
+(define (average n1 n2)
+  (/ (+ n1 n2) 2))
+
+(define (sqrt-improve guess x)
+  (average guess (/ x guess)))
+
+(define (sqrt-stream x)
+  (define guesses
+    (cons-stream 1.0
+                 (stream-map (lambda (guess)
+                               (sqrt-improve guess x))
+                             guesses)))
+  guesses)
+
+(define (sqrt-stream-2 x)
+  (define guesses
+    (cons-stream 1.0
+                 (stream-map (lambda (guess)
+                               (sqrt-improve guess x))
+                             guesses)))
+  guesses)
+
+; 3.64
+
+(define (stream-limit s tolerance)
+  (let ((s1 (stream-car s))
+        (s2 (stream-car (stream-cdr s))))
+    (if (< (abs (- s2 s1)) tolerance) s2
+      (stream-limit (stream-cdr s) tolerance))))
+
+(define (sqrt x tolerance)
+  (stream-limit (sqrt-stream x) tolerance))
+
+;3.67
+
+(define (interleave s1 s2)
+  (if (stream-null? s1)
+    s2
+    (cons-stream (stream-car s1)
+                 (interleave s2 (stream-cdr s1)))))
+
+(define (pairs s t)
+  (cons-stream
+    (list (stream-car s) (stream-car t))
+    (interleave
+      (stream-map (lambda (x) (list (stream-car s) x))
+                  (stream-cdr t))
+      (pairs (stream-cdr s) (stream-cdr t)))))
+
+(define (pairs-2 s t)
+  (cons-stream
+    (list (stream-car s) (stream-car t))
+    (interleave
+      (interleave
+        (stream-map (lambda (x) (list (stream-car s) x))
+                    (stream-cdr t))
+        (pairs (stream-cdr s) (stream-cdr t)))
+      (stream-map (lambda (x) (list (cadr x) (car x)))
+                  (pairs t (stream-cdr s))))))
+
+;3.68
+
+(define (pairs-3 s t)
+  (interleave
+    (stream-map (lambda (x) (list (stream-car s) x))
+                t)
+    (pairs-3 (stream-cdr s) (stream-cdr t))))
+
+;3.69
+
+(define (triples S T U)
+  (define (make-row s T- U-)
+    (cons-stream (list s (stream-car T-) (stream-car U-))
+                 (interleave (stream-map (lambda (x) (list s (stream-car T-) x))
+                                         (stream-cdr U-))
+                             (make-row s (stream-cdr T-) (stream-cdr U-)))))
+  (cons-stream
+    (list (stream-car S) (stream-car T) (stream-car U))
+    (interleave (make-row (stream-car S) T (stream-cdr U))
+                (triples (stream-cdr S) (stream-cdr T) (stream-cdr U)))))
+
+(define (pytha-triples)
+  (stream-filter (lambda (x) (let ((i (car x))
+                                   (j (cadr x))
+                                   (k (caddr x)))
+                               (= (+ (* j j) (* i i)) (* k k))))
+                 (triples integers integers integers)))
+
+;3.70
+
+(define (merge-weighted s1 s2 weigth)
+  (cond ((stream-null? s1) s2)
+        ((stream-null? s2) s1)
+        (else
+          (let ((s1car (stream-car s1))
+                (s2car (stream-car s2)))
+            (cond ((< (weigth s1car) (weigth s2car))
+                   (cons-stream
+                     s1car
+                     (merge (stream-cdr s1) s2)))
+                  ((> (weight s1car) (weight s2car))
+                   (cons-stream
+                     s2car
+                     (merge s1 (stream-cdr s2))))
+                  (else
+                    (cons-stream
+                      s1car
+                      (merge (stream-cdr s1)
+                             (stream-cdr s2)))))))))
