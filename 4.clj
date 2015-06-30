@@ -78,10 +78,10 @@
   (get env exp))
 
 (defmethod eval-exp ::quote [exp env]
-  exp)
+  (second exp))
 
 (defmethod eval-exp ::set! [exp env]
-  (tagged-list? exp 'quote))
+  (assoc env ()))
 
 
 ; default case is application of procedures
