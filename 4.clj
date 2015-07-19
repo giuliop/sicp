@@ -58,35 +58,9 @@
 (defn louis-operands [exp]
   (drop 2 exp))
 
-;c
-(defn -dispatch [exp]
-  (cond (number? exp) :to-self
-        (string? exp) :string
-        (symbol? exp) :variable
-        (list? exp) (keyword (first exp))
-        :else (throw (Exception. (str "Unknown form " exp)))))
+; 4.3
+; see interpreter.clj / default_syntax.clj for an implementation
 
-(defmulti eval-exp (fn [exp env] (-dispatch exp)))
+; 4.4
+; see interpreter.clj / default_syntax.clj
 
-(defn my-eval [exp env]
-  (eval-exp exp env))
-
-(defmethod eval-exp ::to-self [exp env]
-  exp)
-
-(defmethod eval-exp ::variable [exp env]
-  (get env exp))
-
-(defmethod eval-exp ::quote [exp env]
-  (second exp))
-
-(defmethod eval-exp ::set! [exp env]
-  (assoc env ()))
-
-
-; default case is application of procedures
-(defmethod eval-exp :default [exp env]
-  (apply (my-eval (operator exp) env)
-         (list-of-values-left-eval (operands exp) env)))
-
-; etc. etc.

@@ -2,40 +2,250 @@
 
 (defn self-evaluating? [exp]
   (or (number? exp)
-      (string? exp)))
+      (string? exp)
+      (= false exp)
+      (= true exp)))
 
 (defn variable? [exp]
   (symbol? exp))
 
-(def special-clauses {
-                    :quote :quotation
-                    :set! :assignment
-                    :define :definition
-                    :if :if
-                    :lambda :procedure
-                    :begin :actions
-                    :cond :cond
-                    })
+(defn a-list? [exp]
+  (or (list? exp) (= clojure.lang.Cons (type exp))))
 
-(defn clause-type [exp]
+(def special-forms {
+                      :quote  {:type :quotation, :arity #{2}}
+                      :set!   {:type :assignment, :arity #{3}}
+                      :define {:type :definition, :arity #{3}}
+                      :if     {:type :if, :arity #{3 4}}
+                      :lambda {:type :procedure, :arity #{3}}
+                      :begin  {:type :list-of-actions, :arity :arbitrary}
+                      :cond   {:type :cond, :arity :arbitrary}
+                      :or     {:type :or, :arity :arbitrary}
+                      :and    {:type :and, :arity :arbitrary}
+                      :let    {:type :let, :arity #{3 4}}
+                      :let*   {:type :let*, :arity #{3}}
+                      :while  {:type :while :arity #{3}}
+                      })
+
+(def primitives {
+                 :+ '+
+                 :- '-
+                 :* '*
+                 :/ '/
+                 := '=
+                 :list 'list
+                 :null?  'empty?
+                 :car 'first
+                 :cdr 'rest
+                 :cons 'cons
+                 })
+
+(defn arity-ok? [wanted actual]
+  (cond (= wanted :arbitrary) true
+        :else (contains? wanted actual)))
+
+(defn special-form? [exp]
   (if (empty? exp)
     (throw (Exception. (str "Unquoted empty list " exp)))
-    (get special-clauses (first exp) :application)))
+    (let [operator (first exp)]
+      (if (a-list? operator)
+        false
+        (let [{:keys [form arity] :as found}
+              (get special-forms (keyword operator))]
+          (if (not found)
+            false
+            (if (arity-ok? arity (count exp))
+              form
+              (throw (Exception. (str "Wrong arity for: " exp "\n" "Expected " arity))))))))))
 
+(defn primitive-procedure? [proc]
+  (get primitives (keyword (first proc))))
+
+;; Quotations have the form (quote <text-of-quotation>)
 (defn text-of-quotation [exp]
   (second exp))
 
+;; Assignments have the form (set! <var> <value>)
+(defn assignment-variable [exp]
+  (second exp))
 
+(defn assignment-value [exp]
+  (last exp))
 
+;; Definitions have the form (define <var> <value>)
+;; or the form (define (<var> <parameter-1> ... <parameter-n>) <body>)
+;; The latter form (standard procedure definition) is syntactic sugar for
+;; (define <var> (lambda (<parameter-1> ... <parameter-n>) <body>))
+(defn definition-variable [exp]
+  (if (symbol? (second exp))
+    (second exp)
+    (first (second exp))))
 
+(defn make-lambda [params body]
+  (list 'lambda params body))
 
-(defn operator [exp]
-  (first exp))
+(defn make-named-lambda [name params body]
+  (list 'lambda name params body))
 
-(defn operands [exp]
-  (next exp))
+(defn definition-value [exp]
+  (if (symbol? (second exp))
+    (last exp)
+    (let [lambda-exp (last exp)]
+      (make-lambda (second lambda-exp) (last lambda-exp)))))
 
+(defn lambda-params [exp]
+  (second exp))
 
+(defn lambda-body [exp]
+  (last exp))
+
+;; Conditionals begin with if and have a predicate, a consequent, and an
+;; (optional) alternative. If the expression has no alternative part,
+;; we provide false as the alternative
+(defn if-predicate [exp]
+  (second exp))
+
+(defn if-consequent [exp]
+  (first (drop 2 exp)))
+
+(defn if-alternative [exp]
+  (if (= 4 (count exp))
+    (last exp)
+    'false))
+
+(defn make-if [predicate consequent alternative]
+  (list 'if predicate consequent alternative))
+
+;; Begin packages a sequence of expressions into a single expression
+(defn actions [exp] (next exp))
+
+(defn last-exp? [seq] (nil? (next seq)))
+(defn first-exp [seq] (first seq))
+(defn rest-exps [seq] (next seq))
+
+(defn make-begin [seq]
+  (conj seq 'begin ))
+
+(defn sequence->exp [seq]
+  (case (count seq)
+    0 seq
+    1 (first seq)
+    (make-begin seq)))
+
+;; A procedure application is any compound expression that is not one of the
+;; above expression types. The car of the expression is the operator, and the
+;; cdr is the list of operands
+(defn operator [exp] (first exp))
+(defn operands [exp] (next exp))
 (defn no-operands? [ops] (empty? ops))
 (defn first-operand [ops] (first ops))
 (defn rest-operands [ops] (next ops))
+
+;; cond
+(defn cond-clauses [exp] (next exp))
+
+(defn cond-predicate [clause] (first clause))
+
+(defn cond-else-clause? [clause]
+  (= (cond-predicate clause) 'else))
+
+(defn cond-actions [clause] (next clause))
+
+(defn cond-=>-clause? [clause]
+  (= '=> (second clause)))
+
+(defn cond-=>-proc [clause]
+  (last clause))
+
+(defn expand-clauses [clauses]
+  (if (empty? clauses)
+    'false ; no else clause
+     (let [first (first clauses)
+           rest (rest clauses)]
+       (cond (cond-else-clause? first)
+             (if (empty? rest) (sequence->exp (cond-actions first))
+                 (throw (Exception. (str "ELSE clause isn’t last - COND->IF" clauses))))
+             (cond-=>-clause? first)
+             (make-if (cond-predicate first)
+                      ((cond-=>-proc first) (cond-predicate first))
+                      (expand-clauses rest))
+             :else (make-if (cond-predicate first)
+                            (sequence->exp (cond-actions first))
+                            (expand-clauses rest))))))
+
+(defn cond->if [exp]
+  (expand-clauses (cond-clauses exp)))
+
+;; (and c1 ... cn) (or c1 .. cn)
+(defn and-clauses [exp]
+  (next exp))
+
+(defn or-clauses [exp]
+  (next exp))
+
+;; let are derived expressions from lambda
+;;    (let ((<var1> <exp1>) ... (<varn> <expn>)) <body>)
+;; is equivalent to
+;;     ((lambda (<var1> ... <varn>) <body>) <exp1> ... <expn>)
+(defn named-let? [exp]
+  (symbol? (second exp)))
+
+(defn let-name? [exp]
+  (second exp))
+
+(defn let-bindings [exp]
+  (if (named-let? exp)
+    (nth exp 2)
+    (second exp)))
+
+(defn let-vars [exp]
+  (map first (let-bindings exp)))
+
+(defn let-values [exp]
+  (map second (let-bindings exp)))
+
+(defn let-body [exp]
+  (last exp))
+
+(defn let->combination [exp]
+  (let [values (let-values exp)
+        vars (let-vars exp)
+        body (let-body exp)]
+    (if (named-let? exp)
+      (let [name (let-name? exp)]
+        (conj values (make-named-lambda name vars body)))
+      (conj values (make-lambda vars body)))))
+
+;; Let* is similar to let, except that the bindings of the let* variables are
+;; performed sequentially from left to right, and each binding is made in an
+;; environment in which all of the pre- ceding bindings are visible
+
+(defn make-let [bindings body]
+  (list 'let bindings body))
+
+(defn let*->nested-lets [exp]
+  (let [reverse-bindings (reverse (second exp))
+        body (last exp)]
+    (loop [reverse-bindings reverse-bindings body body]
+      (let [let-exp (make-let (list (first reverse-bindings)) body)
+            new-reverse-bindings (next reverse-bindings)] 
+        (if (seq new-reverse-bindings)
+          (recur new-reverse-bindings let-exp)
+          let-exp)))))
+
+;; while has the following syntax
+;; (while cond exp)
+;; e.g.: (while (> 0 x) (begin (display x) (set! x (- x 1))))
+(defn while-cond [exp]
+  (second exp))
+
+(defn while-exp [exp]
+  (last exp))
+
+(defn while->lambda [exp]
+  (make-named-lambda 'name
+                     '()
+                     (make-if (while-cond exp) nil
+                              (make-begin (list (while-exp exp) '(name)))))) 
+
+;; procedure
