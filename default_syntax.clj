@@ -27,18 +27,24 @@
                       :while  {:type :while :arity #{3}}
                       })
 
-(def primitives {
-                 :+ '+
-                 :- '-
-                 :* '*
-                 :/ '/
-                 := '=
-                 :list 'list
-                 :null?  'empty?
-                 :car 'first
-                 :cdr 'rest
-                 :cons 'cons
-                 })
+(def primitives [
+                 :+ +
+                 :- -
+                 :* *
+                 :/ /
+                 := =
+                 :list list
+                 :null?  empty?
+                 :car first
+                 :cdr rest
+                 :cons cons
+                 ])
+
+(defn primitive-procedure-names []
+  (take-nth 2 primitives))
+
+(defn primitive-procedure-objects []
+  (take-nth 2 (drop 1 primitives)))
 
 (defn arity-ok? [wanted actual]
   (cond (= wanted :arbitrary) true
@@ -50,16 +56,13 @@
     (let [operator (first exp)]
       (if (a-list? operator)
         false
-        (let [{:keys [form arity] :as found}
+        (let [{:keys [type arity] :as found}
               (get special-forms (keyword operator))]
           (if (not found)
             false
             (if (arity-ok? arity (count exp))
-              form
+              type
               (throw (Exception. (str "Wrong arity for: " exp "\n" "Expected " arity))))))))))
-
-(defn primitive-procedure? [proc]
-  (get primitives (keyword (first proc))))
 
 ;; Quotations have the form (quote <text-of-quotation>)
 (defn text-of-quotation [exp]
@@ -248,4 +251,3 @@
                      (make-if (while-cond exp) nil
                               (make-begin (list (while-exp exp) '(name)))))) 
 
-;; procedure
