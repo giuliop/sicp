@@ -1,13 +1,6 @@
 (ns interpreter-environment)
 
-(def the-global-environment '[{}])
 (def the-empty-environment [])
-
-(defn update-global-environment! [env]
-  (alter-var-root @the-global-environment env))
-
-(defn reset-global-environment! []
-  (alter-var-root @the-global-environment the-empty-environment))
 
 (defn first-frame [env]
   (peek env))
@@ -16,7 +9,7 @@
   (:id (first-frame env)))
 
 (defn modify-frame [var value env frame-id]
-  (assoc-in env [frame-id (keyword var)] value))
+  (assoc-in env [frame-id :bindings (keyword var)] value))
 
 (defn enclosing-environment [env]
   (pop env))
@@ -29,4 +22,4 @@
  (conj env (make-frame (count env) vars values)))
 
 (defn get-var-in-frame [var frame]
-  (get-in frame :bindings (keyword var)))
+  (get-in frame [:bindings (keyword var)]))
