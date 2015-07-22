@@ -1,11 +1,11 @@
 (ns interpreter
-  (:require [default-syntax :as s]))
+  (:require [default-syntax :as s]
+            [interpreter-environment :as e]))
 
 (declare eval-exp)
-(declare the-global-env)
+
 (defn -eval
-  ([exp] (-eval exp (var the-global-env)))
-  ([exp env] (eval-exp exp env)))
+  ([[exp env]] (eval-exp exp env)))
 
 (defn -dispatch [exp]
   (cond (s/self-evaluating? exp) :to-self
@@ -15,38 +15,50 @@
                           :application)
         :else (throw (Exception. (str "-dispatch / Unknown form " exp)))))
 
-(defn env-check []
-  (= clojure.lang.PersistentList (type the-global-environment)))
+(defmacro invariant [& exps]
+  `{:pre [~@exps]
+    :post [~@exps]})
 
-(defmulti eval-exp (fn [exp env] {:pre [(env-check)]
-                                  :post [(env-check)]}
-                     (-dispatch exp)))
+(defmulti eval-exp (fn [exp env] (-dispatch exp)))
 
 (defmethod eval-exp :to-self [exp env]
-  exp)
+  [exp env])
 
-(declare lookup-variable-value)
+(defn lookup-variable-value [var env]
+    (if (= env e/the-empty-environment)
+      (throw (Exception. (str "Unbound variable " var)))
+      (if-let [value (e/get-var-in-frame var (first-frame env))]
+          value
+          (recur var (e/enclosing-environment env)))))
+
 (defmethod eval-exp :variable [exp env]
-  (lookup-variable-value (keyword exp) env))
+  [(lookup-variable-value exp env) env])
 
 (defmethod eval-exp :quotation [exp env]
-  (s/text-of-quotation exp))
+  [(s/text-of-quotation exp) env])
 
-(declare set-variable-value!)
+(defn set-variable-value! [var value env]
+  (loop [var var, value value, env env, rest-env env]
+    (if (= rest-env e/the-empty-environment)
+      (throw (Exception. (str "Unbound variable " var)))
+      (if (contains? (first-frame rest-env) var)
+        (modify-frame var value env (first-frame-id rest-env))
+        (recur var value env (enclosing-environment rest-env))))))
+
 (defmethod eval-exp :assignment [exp env]
-  (set-variable-value! (keyword (s/assignment-variable exp))
-                       (-eval (s/assignment-value exp) env)
-                       env))
+  (let [var (s/assignment-variable exp)
+        value (s/assignment-value exp)
+        new-env (set-variable-value! var (-eval value env) env)]
+    [(str var " : " value) new-env]))
 
-(declare define-variable!)
+(defn define-variable! [var value env]
+  (modify-frame var value env (first-frame-id env)))
+
 (defmethod eval-exp :definition [exp env]
-  {:pre []}
   (let [var (s/definition-variable exp)
-        value (s/definition-value exp)]
-    (define-variable! (keyword var)
-      (-eval value env)
-      env)
-    (str var " : " value)))
+        value (s/definition-value exp)
+        new-env (define-variable! var (-eval value env) env)]
+    [(str var " : " value) env]))
 
 (defn -true? [x]
   (not (= false x)))
@@ -59,11 +71,14 @@
     (-eval (s/if-consequent exp) env)
     (-eval (s/if-alternative exp) env)))
 
-(declare make-procedure)
+(defn make-procedure [parameters body env]
+  (list 'procedure parameters body env))
+
 (defmethod eval-exp :procedure [exp env]
-  (make-procedure (s/lambda-params exp) (s/lambda-body exp) env))
+  [(make-procedure (s/lambda-params exp) (s/lambda-body exp) env) env])
 
 (defn eval-sequence [exp env]
+  (invariant (env-is-var? env))
   (if (seq exp)
     (do (eval-exp (first exp) env)
         (recur (next exp) env))
@@ -105,12 +120,14 @@
 (-eval (s/while->lambda exp) env))
 
 (defn list-of-values-left-eval [exps env]
+  (invariant (env-is-var? env))
   (if (s/no-operands? exps)
     ()
     (let [first-exp (-eval (s/first-operand exps) env)]
       (conj (list-of-values-left-eval (s/rest-operands exps) env) first-exp))))
 
 (defn list-of-values-right-eval [exps env]
+  (invariant (env-is-var? env))
   (if (s/no-operands? exps)
     ()
     (let [tail-exps (list-of-values-right-eval (s/rest-operands exps) env)]
@@ -118,51 +135,12 @@
 
 (def list-of-values list-of-values-left-eval)
 
-(defn make-procedure [parameters body env]
-  (list 'procedure parameters body env))
-
 (defn compound-procedure? [p]
   (and (list? p) (= 'procedure (first p))))
 
 (defn procedure-parameters [p] (second p))
 (defn procedure-body [p] (nth p 2))
 (defn procedure-environment [p] (last p))
-
-;; the environment is a list of frames indentified by their position in the vector
-(defn enclosing-environment [env] (next env))
-(defn first-frame [env] (first env))
-(def the-empty-environment nil)
-
-(defn make-frame [vars values]
-  (zipmap vars values))
-
-(defn lookup-variable-value [var env]
-  (loop [var var
-         env (deref env)]
-    (if (= env the-empty-environment)
-      (throw (Exception. (str "Unbound variable " var)))
-      (let [value (get var (first-frame env) :not-found)]
-        (if (= value :not-found)
-          (recur var (enclosing-environment env))
-          value)))))
-
-(defn extend-environment [vars values base-env]
-  (alter-var-root base-env
-                  (fn [env] (conj env (make-frame vars values)))))
-
-(defn define-variable! [var value env]
-  (alter-var-root env
-                  (fn [env] (assoc (first-frame env) var value))))
-
-(defn set-variable-value! [var value env]
-  (loop [var var, value value,
-         env env, env-value (deref env)]
-    (if (= env-value the-empty-environment)
-      (throw (Exception. (str "Unbound variable " var)))
-      (if (contains? (first-frame (deref env)) var)
-        (alter-var-root env
-                        (fn [env] (assoc (first-frame env) var value)))
-        (recur var value env (enclosing-environment env-value))))))
 
 (defn primitive-procedure? [proc]
   (= 'primitive (first proc)))
@@ -192,12 +170,6 @@
   (-apply (-eval (s/operator exp) env)
          (list-of-values (s/operands exp) env)))
 
-(def the-global-environment {})
-(defn setup-environment []
-  (alter-var-root (var the-global-environment) {})
-  (extend-environment (s/primitive-procedure-names)
-                      (s/primitive-procedure-objects)
-                      (var the-global-environment)))
 
 ;; (defn user-print [object]
 ;;   (if (compound-procedure? object)
@@ -207,9 +179,20 @@
 ;;                     '<procedure-env>))
 ;;     (print object)))
 
+(defn setup-environment! []
+  (e/reset-global-environment!)
+  (extend-environment! (s/primitive-procedure-names)
+                      (s/primitive-procedure-objects)
+                      @e/the-global-environment))
+
 (defn scheme-eval [input]
-  {:pre [(= clojure.lang.PersistentList (type the-global-environment))]}
-  (if (= {} the-global-environment)
-    (setup-environment)
-    (let [output (-eval input (var the-global-environment))]
-      (println (str "\n out --> " output "\n")))))
+  (when (= e/the-empty-environment e/the-global-environment)
+    (setup-environment!))
+  (let [[output env] (-eval input e/the-global-environment)]
+    (println (str "\n out --> " output))
+    (e/update-global-environment! env)
+    "\n"))
+
+;; convenience aliases for REPL
+(def e scheme-eval)
+(def g e/the-global-environment)
