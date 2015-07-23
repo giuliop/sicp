@@ -28,16 +28,16 @@
                       })
 
 (def primitives [
-                 :+ +
-                 :- -
-                 :* *
-                 :/ /
-                 := =
-                 :list list
-                 :null?  empty?
-                 :car first
-                 :cdr rest
-                 :cons cons
+                 ;; :+ +
+                 ;; :- -
+                 ;; :* *
+                 ;; :/ /
+                 ;; := =
+                 ;; :list list
+                 ;; :null?  empty?
+                 ;; :car first
+                 ;; :cdr rest
+                 ;; :cons cons
                  :println println
                  ])
 
@@ -202,7 +202,7 @@
 (defn named-let? [exp]
   (symbol? (second exp)))
 
-(defn let-name? [exp]
+(defn let-name [exp]
   (second exp))
 
 (defn let-bindings [exp]
@@ -224,11 +224,14 @@
 (defn let->combination [exp]
   (let [values (let-values exp)
         vars (let-vars exp)
-        body (let-body exp)]
+        body (let-body exp)
+        f (make-lambda vars body)]
     (if (named-let? exp)
-      (let [name (let-name? exp)]
-        (conj values (make-named-lambda name vars body)))
-      (conj values (make-lambda vars body)))))
+      (let [name (let-name exp)
+            define-exp (list 'define (list name vars) body)
+            call-exp (conj values name)]
+        (sequence->exp (list define-exp call-exp)))
+      (conj values f))))
 
 ;; Let* is similar to let, except that the bindings of the let* variables are
 ;; performed sequentially from left to right, and each binding is made in an
