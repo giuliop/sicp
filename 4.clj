@@ -58,9 +58,6 @@
 (defn louis-operands [exp]
   (drop 2 exp))
 
-; 4.3
-; see interpreter.clj / default_syntax.clj for an implementation
-
-; 4.4
-; see interpreter.clj / default_syntax.clj
+; 4.3 - 4.10
+; see interpreter.clj
 

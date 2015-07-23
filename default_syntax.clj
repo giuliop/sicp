@@ -17,7 +17,7 @@
                       :set!   {:type :assignment, :arity #{3}}
                       :define {:type :definition, :arity #{3}}
                       :if     {:type :if, :arity #{3 4}}
-                      :lambda {:type :procedure, :arity #{3}}
+                      :lambda {:type :procedure, :arity #{3 4}}
                       :begin  {:type :list-of-actions, :arity :arbitrary}
                       :cond   {:type :cond, :arity :arbitrary}
                       :or     {:type :or, :arity :arbitrary}
@@ -38,13 +38,14 @@
                  :car first
                  :cdr rest
                  :cons cons
+                 :println println
                  ])
 
 (defn primitive-procedure-names []
   (take-nth 2 primitives))
 
 (defn primitive-procedure-objects []
-  (take-nth 2 (drop 1 primitives)))
+  (map #(list 'primitive %1) (take-nth 2 (drop 1 primitives))))
 
 (defn arity-ok? [wanted actual]
   (cond (= wanted :arbitrary) true
@@ -85,7 +86,7 @@
     (first (second exp))))
 
 (defn make-lambda [params body]
-  (list 'lambda params body))
+  (conj (conj body params) 'lambda))
 
 (defn make-named-lambda [name params body]
   (list 'lambda name params body))
@@ -93,14 +94,22 @@
 (defn definition-value [exp]
   (if (symbol? (second exp))
     (last exp)
-    (let [lambda-exp (last exp)]
-      (make-lambda (second lambda-exp) (last lambda-exp)))))
+    (let [params (rest (second exp))
+          body (drop 2 exp)]
+      (make-lambda params body))))
+
+(defn named-lambda? [exp]
+  (symbol? (second exp)))
 
 (defn lambda-params [exp]
-  (second exp))
+  (if (named-lambda? exp)
+    (nth exp 2)
+    (second exp)))
 
 (defn lambda-body [exp]
-  (last exp))
+  (if (named-lambda? exp)
+    (drop 3 exp)
+    (drop 2 exp)))
 
 ;; Conditionals begin with if and have a predicate, a consequent, and an
 ;; (optional) alternative. If the expression has no alternative part,
@@ -145,7 +154,7 @@
 (defn rest-operands [ops] (next ops))
 
 ;; cond
-(defn cond-clauses [exp] (next exp))
+(defn cond-clauses [exp] (rest exp))
 
 (defn cond-predicate [clause] (first clause))
 
@@ -170,7 +179,7 @@
                  (throw (Exception. (str "ELSE clause isn’t last - COND->IF" clauses))))
              (cond-=>-clause? first)
              (make-if (cond-predicate first)
-                      ((cond-=>-proc first) (cond-predicate first))
+                      (list (cond-=>-proc first) (cond-predicate first))
                       (expand-clauses rest))
              :else (make-if (cond-predicate first)
                             (sequence->exp (cond-actions first))
@@ -208,7 +217,9 @@
   (map second (let-bindings exp)))
 
 (defn let-body [exp]
-  (last exp))
+  (if (named-let? exp)
+    (drop 3 exp)
+    (drop 2 exp)))
 
 (defn let->combination [exp]
   (let [values (let-values exp)
