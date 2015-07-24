@@ -1,25 +1,21 @@
 (ns interpreter-environment)
 
-(def the-empty-environment [])
+;; an environment is a map of :vars values and a special key
+;; 'next whose value is the enclosing environment. The 'next key
+;; of the global environment points to the empty environment
+(def the-empty-environment nil)
+(def ^:private next-env 'next)
 
-(defn first-frame [env]
-  (peek env))
-
-(defn first-frame-id [env]
-  (:id (first-frame env)))
-
-(defn modify-frame [var value env frame-id]
-  (assoc-in env [frame-id :bindings (keyword var)] value))
+(defn modify! [var value *env*]
+  (swap! *env* #(assoc %1 (keyword var) value)))
 
 (defn enclosing-environment [env]
-  (pop env))
+  ('next env))
 
-(defn make-frame [id vars values]
-  (let [bindings (zipmap vars values)]
-    {:id id :bindings bindings}))
+(defn make-new [vars values *base-env*]
+  (-> (zipmap vars values)
+      (assoc next-env *base-env*)
+      (atom)))
 
-(defn extend-environment [vars values env]
- (conj env (make-frame (count env) vars values)))
-
-(defn get-var-in-frame [var frame]
-  (get-in frame [:bindings (keyword var)]))
+(defn var-value [var env]
+  ((keyword var) env))

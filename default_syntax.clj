@@ -15,7 +15,7 @@
 (def special-forms {
                       :quote  {:type :quotation, :arity #{2}}
                       :set!   {:type :assignment, :arity #{3}}
-                      :define {:type :definition, :arity #{3}}
+                      :define {:type :definition, :arity :arbitrary}
                       :if     {:type :if, :arity #{3 4}}
                       :lambda {:type :procedure, :arity #{3 4}}
                       :begin  {:type :list-of-actions, :arity :arbitrary}
@@ -38,7 +38,7 @@
                  ;; :car first
                  ;; :cdr rest
                  ;; :cons cons
-                 :println println
+                 ;; :println println
                  ])
 
 (defn primitive-procedure-names []
@@ -85,12 +85,6 @@
     (second exp)
     (first (second exp))))
 
-(defn make-lambda [params body]
-  (conj (conj body params) 'lambda))
-
-(defn make-named-lambda [name params body]
-  (list 'lambda name params body))
-
 (defn definition-value [exp]
   (if (symbol? (second exp))
     (last exp)
@@ -98,18 +92,17 @@
           body (drop 2 exp)]
       (make-lambda params body))))
 
-(defn named-lambda? [exp]
-  (symbol? (second exp)))
+(defn make-lambda [params body]
+  {:pre (list? (first body))} ; body is a list of expressions
+  (-> body
+      (conj params)
+      (conj 'lambda)))
 
 (defn lambda-params [exp]
-  (if (named-lambda? exp)
-    (nth exp 2)
-    (second exp)))
+    (second exp))
 
 (defn lambda-body [exp]
-  (if (named-lambda? exp)
-    (drop 3 exp)
-    (drop 2 exp)))
+    (drop 2 exp))
 
 ;; Conditionals begin with if and have a predicate, a consequent, and an
 ;; (optional) alternative. If the expression has no alternative part,
@@ -129,16 +122,16 @@
   (list 'if predicate consequent alternative))
 
 ;; Begin packages a sequence of expressions into a single expression
-(defn actions [exp] (next exp))
+(defn make-begin [seq]
+  (conj seq 'begin ))
 
+(defn sequence-actions [seq-exp] (next seq-exp))
 (defn last-exp? [seq] (nil? (next seq)))
 (defn first-exp [seq] (first seq))
 (defn rest-exps [seq] (next seq))
 
-(defn make-begin [seq]
-  (conj seq 'begin ))
-
 (defn sequence->exp [seq]
+  {:pre [(or (empty? seq)) (list? (first seq))]} ; seq is a list of expressions
   (case (count seq)
     0 seq
     1 (first seq)
@@ -148,20 +141,19 @@
 ;; above expression types. The car of the expression is the operator, and the
 ;; cdr is the list of operands
 (defn operator [exp] (first exp))
-(defn operands [exp] (next exp))
+(defn operands [exp] (rest exp))
 (defn no-operands? [ops] (empty? ops))
 (defn first-operand [ops] (first ops))
-(defn rest-operands [ops] (next ops))
+(defn rest-operands [ops] (rest ops))
 
 ;; cond
 (defn cond-clauses [exp] (rest exp))
-
 (defn cond-predicate [clause] (first clause))
+(defn cond-actions [clause] (next clause))
 
 (defn cond-else-clause? [clause]
   (= (cond-predicate clause) 'else))
 
-(defn cond-actions [clause] (next clause))
 
 (defn cond-=>-clause? [clause]
   (= '=> (second clause)))
@@ -221,6 +213,12 @@
     (drop 3 exp)
     (drop 2 exp)))
 
+;; (defn make-lambda-creator [params body]
+;;   (make-lambda () (list (make-lambda params body))))
+
+;; (defn make-callable [name exp]
+  ;; (clojure.walk/postwalk-replace {name (list name)} exp))
+
 (defn let->combination [exp]
   (let [values (let-values exp)
         vars (let-vars exp)
@@ -228,15 +226,14 @@
         f (make-lambda vars body)]
     (if (named-let? exp)
       (let [name (let-name exp)
-            define-exp (list 'define (list name vars) body)
-            call-exp (conj values name)]
-        (sequence->exp (list define-exp call-exp)))
+            define-exp (list 'define name f)
+            call-exp (conj values (list name))]
+        (make-lambda () (list define-exp call-exp)))
       (conj values f))))
 
-;; Let* is similar to let, except that the bindings of the let* variables are
-;; performed sequentially from left to right, and each binding is made in an
-;; environment in which all of the pre- ceding bindings are visible
-
+  ;; Let* is similar to let, except that the bindings of the let* variables are
+  ;; performed sequentially from left to right, and each binding is made in an
+;; environment in which all of the preceding bindings are visible
 (defn make-let [bindings body]
   (list 'let bindings body))
 
@@ -251,17 +248,18 @@
           let-exp)))))
 
 ;; while has the following syntax
-;; (while cond exp)
-;; e.g.: (while (> 0 x) (begin (display x) (set! x (- x 1))))
+;; (while cond exps)
+;; e.g.: (while (> 0 x) (display x) (set! x (- x 1)))
 (defn while-cond [exp]
   (second exp))
 
 (defn while-exp [exp]
-  (last exp))
+  (drop 2 exp))
 
 (defn while->lambda [exp]
-  (make-named-lambda 'name
-                     '()
-                     (make-if (while-cond exp) nil
-                              (make-begin (list (while-exp exp) '(name)))))) 
-
+  (let [iter-func (make-lambda ()
+                               (list (make-if (while-cond exp) 
+                                              (sequence->exp (concat (while-exp exp)
+                                                                     '((iter))))
+                                         nil)))]
+    (make-lambda () (list (list 'define 'iter iter-func) '(iter)))))

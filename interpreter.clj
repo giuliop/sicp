@@ -6,9 +6,19 @@
   `{:pre [~@exps]
     :post [~@exps]})
 
-(defn -dispatch [[exp env]]
-  ;; (println exp)
-  ;; (println env)
+;; this line is to make sure changes to defmulti are re-evaluated in cider
+(def eval-exp nil)
+
+(defn debug-eval [exp env]
+  (println exp)
+  (if (atom? env)
+    (println "(atom) -> " @env)
+    (println "-> " env))
+  (newline))
+
+(defn -dispatch [exp env]
+  {:pre [(var? env)]}
+  ;; (debug exp env)
   (cond (s/self-evaluating? exp) :to-self
         (s/variable? exp) :variable
         (s/a-list? exp) (if-let [form (s/special-form? exp)]
@@ -18,26 +28,24 @@
 
 (defmulti eval-exp -dispatch)
 
-(defmethod eval-exp :to-self [[exp env]]
-  [exp env])
+(defmethod eval-exp :to-self [exp env]
+  exp)
 
 (defn lookup-variable-value [var env]
-  ;; (println var)
-  ;; (println env)
   (if (= env e/the-empty-environment)
     (throw (Exception. (str "Unbound variable " var)))
     (if-let [value (e/get-var-in-frame var (e/first-frame env))]
       value
       (recur var (e/enclosing-environment env)))))
 
-(defmethod eval-exp :variable [[exp env]] 
-  [(lookup-variable-value exp env) env])
+(defmethod eval-exp :variable [exp env] 
+  (lookup-variable-value exp env))
 
-(defmethod eval-exp :quotation [[exp ^Int env]]
-  [(s/text-of-quotation exp) env])
+(defmethod eval-exp :quotation [exp env]
+  (s/text-of-quotation exp))
 
-(defn set-variable-value [var value env]
-  (loop [var var, value value, env env, rest-env env]
+(defn set-variable-value! [var value env]
+  (loop [var var, value value, rest-env env]
     (cond (= rest-env e/the-empty-environment)
             (throw (Exception. (str "Unbound variable " var)))
           (e/get-var-in-frame var (e/first-frame rest-env))
@@ -90,7 +98,7 @@
     nil))
 
 (defmethod eval-exp :list-of-actions [[exp env]]
-  (eval-sequence (s/actions exp) env))
+  (eval-sequence (s/sequence-actions exp) env))
 
 (defmethod eval-exp :cond [[exp env]]
   (eval-exp [(s/cond->if exp) env]))
