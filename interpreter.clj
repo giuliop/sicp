@@ -1,6 +1,7 @@
 (ns interpreter
-  (:require [default-syntax :as s]
-            [interpreter-environment :as e]))
+  (:require [default-syntax :as syn]
+            [interpreter-environment :as env]
+            [test :as test]))
 
 (defmacro invariant [& exps]
   `{:pre [~@exps]
@@ -9,66 +10,67 @@
 ;; this line is to make sure changes to defmulti are re-evaluated in cider
 (def eval-exp nil)
 
-(defn debug-eval [exp env]
-  (println exp)
-  (if (atom? env)
-    (println "(atom) -> " @env)
-    (println "-> " env))
+(def the-global-environment)
+
+(defn debug-value-env [value env]
+  (println value)
+  (env/pprint env)
   (newline))
 
-(defn -dispatch [exp env]
-  {:pre [(var? env)]}
-  ;; (debug exp env)
-  (cond (s/self-evaluating? exp) :to-self
-        (s/variable? exp) :variable
-        (s/a-list? exp) (if-let [form (s/special-form? exp)]
+(defn -dispatch [exp *env*]
+  {:pre [(env/pointer? *env*)]}
+  ;; (debug-value-env exp *env*)
+  (cond (syn/self-evaluating? exp) :to-self
+        (syn/variable? exp) :variable
+        (syn/a-list? exp) (if-let [form (syn/special-form? exp)]
                           form
                           :application)
         :else (throw (Exception. (str "-dispatch / Unknown form " exp)))))
 
 (defmulti eval-exp -dispatch)
 
-(defmethod eval-exp :to-self [exp env]
+(defmethod eval-exp :to-self [exp *env*]
   exp)
 
 (defn lookup-variable-value [var env]
-  (if (= env e/the-empty-environment)
+  (if (= env env/the-empty-environment)
     (throw (Exception. (str "Unbound variable " var)))
-    (if-let [value (e/get-var-in-frame var (e/first-frame env))]
-      value
-      (recur var (e/enclosing-environment env)))))
+    (let [value (env/var-value var env)]
+      (if (= value 'not-found)
+        (recur var @(env/enclosing-environment env))
+        value))))
 
-(defmethod eval-exp :variable [exp env] 
-  (lookup-variable-value exp env))
+(defmethod eval-exp :variable [exp *env*] 
+  (lookup-variable-value exp @*env*))
 
-(defmethod eval-exp :quotation [exp env]
-  (s/text-of-quotation exp))
+(defmethod eval-exp :quotation [exp *env*]
+  (syn/text-of-quotation exp))
 
-(defn set-variable-value! [var value env]
-  (loop [var var, value value, rest-env env]
-    (cond (= rest-env e/the-empty-environment)
-            (throw (Exception. (str "Unbound variable " var)))
-          (e/get-var-in-frame var (e/first-frame rest-env))
-            (e/modify-frame var value env (e/first-frame-id rest-env))
-          :else (recur var value env (e/enclosing-environment rest-env)))))
-
-(defmethod eval-exp :assignment [[exp env]]
-  (let [var (s/assignment-variable exp)
-        value (s/assignment-value exp)
-        [value env] (eval-exp [value env])
-        env (set-variable-value var value env)]
-    [(str var " : " value) env]))
-
-(defn define-variable [var value env]
-  (e/modify-frame var value env (e/first-frame-id env)))
+(defn set-variable-value! [var value *env*]
+  (cond (= @*env* env/the-empty-environment)
+          (throw (Exception. (str "Unbound variable " var)))
+        (env/var-value var @*env*)
+          (env/modify! var value *env*)
+        :else (recur var value (env/enclosing-environment))))
 
 (declare user-format)
-(defmethod eval-exp :definition [[exp env]]
-  (let [var (s/definition-variable exp)
-        value (s/definition-value exp)
-        [value env] (eval-exp [value env])
-        env (define-variable var value env)]
-    [(str var " : " (user-format value)) env]))
+(defmethod eval-exp :assignment [exp *env*]
+  (let [var (syn/assignment-variable exp)
+        value (syn/assignment-value exp)
+        value (eval-exp value *env*)]
+    (set-variable-value! var value *env*)
+    (str var " : " (user-format value))))
+
+(defn define-variable! [var value *env*]
+  (env/modify! var value *env*))
+
+(declare user-format)
+(defmethod eval-exp :definition [exp *env*]
+  (let [var (syn/definition-variable exp)
+        value (syn/definition-value exp)
+        value (eval-exp value *env*)]
+    (define-variable! var value *env*)
+    (str var " : " (user-format value))))
 
 (defn -true? [x]
   (not (= false x)))
@@ -76,76 +78,75 @@
 (defn -false? [x]
   (= false x))
 
-(defmethod eval-exp :if [[exp env]]
-  (let [[pred env] (eval-exp [(s/if-predicate exp) env])]
+(defmethod eval-exp :if [exp *env*]
+  (let [pred (eval-exp (syn/if-predicate exp) *env*)]
     (if (-true? pred)
-      (eval-exp [(s/if-consequent exp) env])
-      (eval-exp [(s/if-alternative exp) env]))))
+      (eval-exp (syn/if-consequent exp) *env*)
+      (eval-exp (syn/if-alternative exp) *env*))))
 
-(defn make-procedure [parameters body env]
-  (list 'procedure parameters body env))
+(defn make-procedure [parameters body *env*]
+  (list 'procedure parameters body *env*))
 
-(defmethod eval-exp :procedure [[exp env]]
-  [(make-procedure (s/lambda-params exp) (s/lambda-body exp) env) env])
+(defmethod eval-exp :procedure [exp *env*]
+  (make-procedure (syn/lambda-params exp) (syn/lambda-body exp) *env*))
 
-(defn eval-sequence [actions env]
-  (if (seq actions)
-    (loop [[ret env] (eval-exp [(first actions) env])
-           rest-actions (rest actions)]
-      (if (empty? rest-actions)
-        [ret env]
-        (recur (eval-exp [(first rest-actions) env]) (rest rest-actions))))
-    nil))
+(defn eval-sequence [actions *env*]
+  (let [first-value (eval-exp (syn/first-action actions) *env*)]
+    (if (syn/last-action? actions)
+      first-value
+      (recur (syn/rest-actions actions) *env*))))
 
-(defmethod eval-exp :list-of-actions [[exp env]]
-  (eval-sequence (s/sequence-actions exp) env))
+(defmethod eval-exp :list-of-actions [exp *env*]
+  (eval-sequence (syn/sequence-actions exp) *env*))
 
-(defmethod eval-exp :cond [[exp env]]
-  (eval-exp [(s/cond->if exp) env]))
+(defmethod eval-exp :cond [exp *env*]
+  (eval-exp [(syn/cond->if exp) *env*]))
 
-(defmethod eval-exp :or [[exp env]]
-  (loop [exp (s/or-clauses exp)
-         env env]
-    (if (seq exp)
-      (let [[x env] (eval-exp [(first exp) env])]
+(defmethod eval-exp :or [exp *env*]
+  (loop [exps (syn/or-clauses exp)
+         *env* *env*]
+    (if (seq exps)
+      (let [x (eval-exp (first exps) *env*)]
         (if x
-          [true env]
-          (recur (next exp) env)))
-      [false env])))
+          true
+          (recur (next exps) *env*)))
+      false)))
 
-(defmethod eval-exp :and [[exp env]]
-  (loop [exp (s/and-clauses exp)
-         env env]
+(defmethod eval-exp :and [exp *env*]
+  (loop [exp (syn/and-clauses exp)
+         *env* *env*]
     (if (seq exp)
-      (let [[x env] (eval-exp [(first exp) env])]
+      (let [x (eval-exp (first exp) *env*)]
         (if x
-          (recur (next exp) env)
-          [false env]))
-      [true env])))
+          (recur (next exp) *env*)
+          false))
+      true)))
 
-(defmethod eval-exp :let [[exp env]]
-  (eval-exp [(s/let->combination exp) env]))
+(defmethod eval-exp :let [exp *env*]
+  (eval-exp (syn/let->combination exp) *env*))
 
 (defmethod eval-exp :let* [[exp env]]
-  (eval-exp [(s/let*->nested-lets exp) env]))
+  (eval-exp [(syn/let*->nested-lets exp) env]))
 
-(defmethod eval-exp :while [[exp env]]
-  (println (s/while->lambda exp)))
-  ;; (eval-exp [(s/while->lambda exp) env]))
+(defmethod eval-exp :while [exp *env*]
+  ;; (println (syn/while->lambda exp)))
+  (eval-exp (syn/while->lambda exp) *env*))
 
-(defn list-of-values-left-eval-exp [exps env]
-  (if (s/no-operands? exps)
-    [() env]
-    (let [[first-exp env] (eval-exp [(s/first-operand exps) env])
-          [exps env] (list-of-values-left-eval-exp (s/rest-operands exps) env)]
-      [(conj exps first-exp) env])))
+(defn list-of-values-left-eval-exp [exps *env*]
+  (loop [res () exps exps]
+    (if (syn/no-operands? exps)
+      res
+      (let [value (eval-exp (syn/first-operand exps) *env*)
+            res (concat res (list value))
+            exps (syn/rest-operands exps)]
+        (recur res exps)))))
 
-(defn list-of-values-right-eval-exp [exps env]
-  (if (s/no-operands? exps)
-    [() env]
-    (let [[tail-exps env] (list-of-values-right-eval-exp (s/rest-operands exps) env)
-          [exp env] (eval-exp [(s/first-operand exps) env])]
-      [(conj tail-exps exp) env])))
+(defn list-of-values-right-eval-exp [exps *env*]
+  (if (syn/no-operands? exps)
+    ()
+    (let [tail-exps (list-of-values-right-eval-exp (syn/rest-operands exps) *env*)
+          exp (eval-exp (syn/first-operand exps) *env*)]
+      (conj tail-exps exp) *env*)))
 
 (def list-of-values list-of-values-left-eval-exp)
 
@@ -165,24 +166,21 @@
 (defn apply-primitive-procedure [proc args]
   (apply (primitive-implementation proc) args))
 
-(defn -apply [procedure arguments base-env]
+(defn -apply [procedure arguments]
   (cond (primitive-procedure? procedure)
-        [(apply-primitive-procedure procedure arguments) base-env]
+          (apply-primitive-procedure procedure arguments)
         (compound-procedure? procedure)
-          (let [[exp env]
-                (eval-sequence
-                 (procedure-body procedure)
-                 (e/extend-environment
-                  (map keyword (procedure-parameters procedure))
-                  arguments
-                  (procedure-environment procedure)))]
-            [exp base-env])
-          :else (throw (Exception. (str "Unknown procedure type - APPLY" procedure)))))
+          (eval-sequence (procedure-body procedure)
+                         (env/extend-with
+                            (procedure-parameters procedure)
+                            arguments
+                            (procedure-environment procedure)))
+        :else (throw (Exception. (str "Unknown procedure type - APPLY" procedure)))))
 
-(defmethod eval-exp :application [[exp env]]
-  (let [[op env] (eval-exp [(s/operator exp) env])
-        [args env] (list-of-values (s/operands exp) env)]
-    (-apply op args env)))
+(defmethod eval-exp :application [exp *env*]
+  (let [op (eval-exp (syn/operator exp) *env*)
+        args (list-of-values (syn/operands exp) *env*)]
+    (-apply op args)))
 
 (defn user-format [object]
   (if (compound-procedure? object)
@@ -192,24 +190,18 @@
           '<procedure-env>)
     object))
 
-(def the-global-environment)
-
-(defn update-the-global-environment! [env]
-  (alter-var-root #'the-global-environment (fn [old] env)))
-
-(defn setup-environment! []
-  (update-the-global-environment!
-   (e/extend-environment (s/primitive-procedure-names)
-                         (s/primitive-procedure-objects)
-                         e/the-empty-environment)))
+(defn setup-global-environment! []
+  (alter-var-root #'the-global-environment
+                  (fn [*env*] (env/extend-with (syn/primitive-procedure-names)
+                                (syn/primitive-procedure-objects)
+                                env/the-empty-environment))))
 
 (defn scheme-eval-exp [input]
   (when-not (bound? #'the-global-environment)
-    (setup-environment!))
-  (let [[output env] (eval-exp [input the-global-environment])]
-    (println (str "\n out --> " (user-format output)))
-    (update-the-global-environment! env)
-    (newline)))
+    (setup-global-environment!))
+  (let [output (eval-exp input the-global-environment)]
+        (println (str "\n out --> " (user-format output)))
+        (newline)))
 
 ;; convenience aliases for REPL
 (def e scheme-eval-exp)

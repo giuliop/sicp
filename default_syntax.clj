@@ -28,17 +28,17 @@
                       })
 
 (def primitives [
-                 ;; :+ +
-                 ;; :- -
-                 ;; :* *
-                 ;; :/ /
-                 ;; := =
-                 ;; :list list
-                 ;; :null?  empty?
-                 ;; :car first
-                 ;; :cdr rest
-                 ;; :cons cons
-                 ;; :println println
+                 :+ +
+                 :- -
+                 :* *
+                 :/ /
+                 := =
+                 :list list
+                 :null?  empty?
+                 :car first
+                 :cdr rest
+                 :cons cons
+                 :display print
                  ])
 
 (defn primitive-procedure-names []
@@ -80,18 +80,6 @@
 ;; or the form (define (<var> <parameter-1> ... <parameter-n>) <body>)
 ;; The latter form (standard procedure definition) is syntactic sugar for
 ;; (define <var> (lambda (<parameter-1> ... <parameter-n>) <body>))
-(defn definition-variable [exp]
-  (if (symbol? (second exp))
-    (second exp)
-    (first (second exp))))
-
-(defn definition-value [exp]
-  (if (symbol? (second exp))
-    (last exp)
-    (let [params (rest (second exp))
-          body (drop 2 exp)]
-      (make-lambda params body))))
-
 (defn make-lambda [params body]
   {:pre (list? (first body))} ; body is a list of expressions
   (-> body
@@ -103,6 +91,18 @@
 
 (defn lambda-body [exp]
     (drop 2 exp))
+
+(defn definition-variable [exp]
+  (if (symbol? (second exp))
+    (second exp)
+    (first (second exp))))
+
+(defn definition-value [exp]
+  (if (symbol? (second exp))
+    (last exp)
+    (let [params (rest (second exp))
+          body (drop 2 exp)]
+      (make-lambda params body))))
 
 ;; Conditionals begin with if and have a predicate, a consequent, and an
 ;; (optional) alternative. If the expression has no alternative part,
@@ -126,9 +126,9 @@
   (conj seq 'begin ))
 
 (defn sequence-actions [seq-exp] (next seq-exp))
-(defn last-exp? [seq] (nil? (next seq)))
-(defn first-exp [seq] (first seq))
-(defn rest-exps [seq] (next seq))
+(defn last-action? [seq] (nil? (next seq)))
+(defn first-action [seq] (first seq))
+(defn rest-actions [seq] (next seq))
 
 (defn sequence->exp [seq]
   {:pre [(or (empty? seq)) (list? (first seq))]} ; seq is a list of expressions
@@ -227,8 +227,8 @@
     (if (named-let? exp)
       (let [name (let-name exp)
             define-exp (list 'define name f)
-            call-exp (conj values (list name))]
-        (make-lambda () (list define-exp call-exp)))
+            call-exp (conj values name)]
+        (list (make-lambda () (list define-exp call-exp))))
       (conj values f))))
 
   ;; Let* is similar to let, except that the bindings of the let* variables are
