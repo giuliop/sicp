@@ -24,7 +24,7 @@
                       :and    {:type :and, :arity :arbitrary}
                       :let    {:type :let, :arity #{3 4}}
                       :let*   {:type :let*, :arity #{3}}
-                      :while  {:type :while :arity #{3}}
+                      :while  {:type :while :arity :arbitrary}
                       })
 
 (def primitives [
@@ -33,12 +33,15 @@
                  :* *
                  :/ /
                  := =
+                 :< <
+                 :> >
                  :list list
                  :null?  empty?
                  :car first
                  :cdr rest
                  :cons cons
                  :display print
+                 :newline newline
                  ])
 
 (defn primitive-procedure-names []
@@ -131,7 +134,7 @@
 (defn rest-actions [seq] (next seq))
 
 (defn sequence->exp [seq]
-  {:pre [(or (empty? seq)) (list? (first seq))]} ; seq is a list of expressions
+  {:pre [(or (empty? seq) (list? (first seq)))]} ; seq is a list of expressions
   (case (count seq)
     0 seq
     1 (first seq)
@@ -213,12 +216,6 @@
     (drop 3 exp)
     (drop 2 exp)))
 
-;; (defn make-lambda-creator [params body]
-;;   (make-lambda () (list (make-lambda params body))))
-
-;; (defn make-callable [name exp]
-  ;; (clojure.walk/postwalk-replace {name (list name)} exp))
-
 (defn let->combination [exp]
   (let [values (let-values exp)
         vars (let-vars exp)
@@ -231,8 +228,8 @@
         (list (make-lambda () (list define-exp call-exp))))
       (conj values f))))
 
-  ;; Let* is similar to let, except that the bindings of the let* variables are
-  ;; performed sequentially from left to right, and each binding is made in an
+;; Let* is similar to let, except that the bindings of the let* variables are
+;; performed sequentially from left to right, and each binding is made in an
 ;; environment in which all of the preceding bindings are visible
 (defn make-let [bindings body]
   (list 'let bindings body))
@@ -257,9 +254,10 @@
   (drop 2 exp))
 
 (defn while->lambda [exp]
-  (let [iter-func (make-lambda ()
-                               (list (make-if (while-cond exp) 
-                                              (sequence->exp (concat (while-exp exp)
-                                                                     '((iter))))
-                                         nil)))]
-    (make-lambda () (list (list 'define 'iter iter-func) '(iter)))))
+  (let [iter-func
+        (make-lambda
+         ()
+         (list (make-if (while-cond exp) 
+                        (sequence->exp (concat (while-exp exp) '((iter))))
+                        ''nil)))]
+    (list (make-lambda () (list (list 'define 'iter iter-func) '(iter))))))

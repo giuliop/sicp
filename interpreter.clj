@@ -33,12 +33,13 @@
   exp)
 
 (defn lookup-variable-value [var env]
-  (if (= env env/the-empty-environment)
-    (throw (Exception. (str "Unbound variable " var)))
-    (let [value (env/var-value var env)]
-      (if (= value 'not-found)
-        (recur var @(env/enclosing-environment env))
-        value))))
+  (let [value (env/var-value var env)
+        next (env/enclosing-environment env)]
+    (if (not= value 'not-found)
+      value
+      (if (not= next env/the-empty-environment)
+        (recur var @next)
+        (throw (Exception. (str "Unbound variable " var)))))))
 
 (defmethod eval-exp :variable [exp *env*] 
   (lookup-variable-value exp @*env*))
@@ -47,11 +48,11 @@
   (syn/text-of-quotation exp))
 
 (defn set-variable-value! [var value *env*]
-  (cond (= @*env* env/the-empty-environment)
+  (cond (= *env* env/the-empty-environment)
           (throw (Exception. (str "Unbound variable " var)))
-        (env/var-value var @*env*)
+        (not= 'not-found (env/var-value var @*env*))
           (env/modify! var value *env*)
-        :else (recur var value (env/enclosing-environment))))
+        :else (recur var value (env/enclosing-environment @*env*))))
 
 (declare user-format)
 (defmethod eval-exp :assignment [exp *env*]
@@ -129,7 +130,6 @@
   (eval-exp [(syn/let*->nested-lets exp) env]))
 
 (defmethod eval-exp :while [exp *env*]
-  ;; (println (syn/while->lambda exp)))
   (eval-exp (syn/while->lambda exp) *env*))
 
 (defn list-of-values-left-eval-exp [exps *env*]
@@ -200,7 +200,7 @@
   (when-not (bound? #'the-global-environment)
     (setup-global-environment!))
   (let [output (eval-exp input the-global-environment)]
-        (println (str "\n out --> " (user-format output)))
+        (println (str "\n--> " (user-format output)))
         (newline)))
 
 ;; convenience aliases for REPL
