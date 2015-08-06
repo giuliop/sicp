@@ -190,15 +190,18 @@
           '<procedure-env>)
     object))
 
-(defn setup-global-environment! []
+(defn make-global-environment []
+  (env/extend-with (syn/primitive-procedure-names)
+                   (syn/primitive-procedure-objects)
+                   env/the-empty-environment))
+
+(defn reset-global-environment! []
   (alter-var-root #'the-global-environment
-                  (fn [*env*] (env/extend-with (syn/primitive-procedure-names)
-                                (syn/primitive-procedure-objects)
-                                env/the-empty-environment))))
+                  (fn [_] (make-global-environment))))
 
 (defn scheme-eval-exp [input]
   (when-not (bound? #'the-global-environment)
-    (setup-global-environment!))
+    (reset-global-environment!))
   (let [output (eval-exp input the-global-environment)]
         (println (str "\n--> " (user-format output)))
         (newline)))
