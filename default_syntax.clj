@@ -134,7 +134,6 @@
 (defn rest-actions [seq] (next seq))
 
 (defn sequence->exp [seq]
-  {:pre [(or (empty? seq) (list? (first seq)))]} ; seq is a list of expressions
   (case (count seq)
     0 seq
     1 (first seq)

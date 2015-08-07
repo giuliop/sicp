@@ -1,7 +1,6 @@
 (ns interpreter
   (:require [default-syntax :as syn]
-            [interpreter-environment :as env]
-            [test :as test]))
+            [interpreter-environment :as env]))
 
 (defmacro invariant [& exps]
   `{:pre [~@exps]
@@ -101,33 +100,32 @@
   (eval-sequence (syn/sequence-actions exp) *env*))
 
 (defmethod eval-exp :cond [exp *env*]
-  (eval-exp [(syn/cond->if exp) *env*]))
+  (eval-exp (syn/cond->if exp) *env*))
 
 (defmethod eval-exp :or [exp *env*]
   (loop [exps (syn/or-clauses exp)
          *env* *env*]
     (if (seq exps)
-      (let [x (eval-exp (first exps) *env*)]
-        (if x
-          true
-          (recur (next exps) *env*)))
+      (if-let [x (eval-exp (first exps) *env*)]
+        x
+        (recur (next exps) *env*))
       false)))
 
 (defmethod eval-exp :and [exp *env*]
   (loop [exp (syn/and-clauses exp)
-         *env* *env*]
+         *env* *env*
+         res true]
     (if (seq exp)
-      (let [x (eval-exp (first exp) *env*)]
-        (if x
-          (recur (next exp) *env*)
-          false))
-      true)))
+      (if-let [x (eval-exp (first exp) *env*)]
+        (recur (next exp) *env* x)
+        false)
+      res)))
 
 (defmethod eval-exp :let [exp *env*]
   (eval-exp (syn/let->combination exp) *env*))
 
-(defmethod eval-exp :let* [[exp env]]
-  (eval-exp [(syn/let*->nested-lets exp) env]))
+(defmethod eval-exp :let* [exp env]
+  (eval-exp (syn/let*->nested-lets exp) env))
 
 (defmethod eval-exp :while [exp *env*]
   (eval-exp (syn/while->lambda exp) *env*))
