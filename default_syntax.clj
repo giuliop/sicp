@@ -17,7 +17,7 @@
                       :set!   {:type :assignment, :arity #{3}}
                       :define {:type :definition, :arity :arbitrary}
                       :if     {:type :if, :arity #{3 4}}
-                      :lambda {:type :procedure, :arity #{3 4}}
+                      :lambda {:type :procedure, :arity :arbitrary}
                       :begin  {:type :list-of-actions, :arity :arbitrary}
                       :cond   {:type :cond, :arity :arbitrary}
                       :or     {:type :or, :arity :arbitrary}

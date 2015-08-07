@@ -18,7 +18,7 @@
       (atom)))
 
 (defn var-value [var env]
-  ((keyword var) env 'not-found))
+  ((keyword var) env '_*unbound*_))
 
 (defn pointer? [env]
   (instance? clojure.lang.Atom env))

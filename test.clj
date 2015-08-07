@@ -8,7 +8,8 @@
 
 (defn setup [f]
   (reset-global-environment!)
-  (f))
+  (f)
+(reset-global-environment!))
 
 (use-fixtures :each setup)
 
