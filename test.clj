@@ -86,3 +86,16 @@
   (is (= 15 (ev '(let ((x 5) (y 10))
                    (while (> x 0) (set! y (+ y 1)) (set! x (- x 1)))
                    y)))))
+
+(deftest scan-out-defines
+  (let [in '(lambda (a b)
+                        (define x 5)
+                        (define y (* 2 a))
+                        ('exp1) ('exp2) ('exp3))
+        out '(let ((x '_*unbound*_)
+                   (y '_*unbound*_))
+               (set! x 5)
+               (set! y (* 2 a))
+               ('exp1) ('exp2) ('exp3))]
+   (is (= out (interpreter/scan-out-defines (default-syntax/lambda-body in)))))
+  )

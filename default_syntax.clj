@@ -13,18 +13,18 @@
   (or (list? exp) (= clojure.lang.Cons (type exp))))
 
 (def special-forms {
-                      :quote  {:type :quotation, :arity #{2}}
-                      :set!   {:type :assignment, :arity #{3}}
-                      :define {:type :definition, :arity :arbitrary}
-                      :if     {:type :if, :arity #{3 4}}
-                      :lambda {:type :procedure, :arity :arbitrary}
-                      :begin  {:type :list-of-actions, :arity :arbitrary}
-                      :cond   {:type :cond, :arity :arbitrary}
-                      :or     {:type :or, :arity :arbitrary}
-                      :and    {:type :and, :arity :arbitrary}
-                      :let    {:type :let, :arity #{3 4}}
-                      :let*   {:type :let*, :arity #{3}}
-                      :while  {:type :while :arity :arbitrary}
+                      :quote :quotation
+                      :set! :assignment
+                      :define :definition
+                      :if :if
+                      :lambda :procedure
+                      :begin :list-of-actions
+                      :cond :cond
+                      :or :or
+                      :and :and
+                      :let :let
+                      :let* :let*
+                      :while :while
                       })
 
 (def primitives [
@@ -50,23 +50,13 @@
 (defn primitive-procedure-objects []
   (map #(list 'primitive %1) (take-nth 2 (drop 1 primitives))))
 
-(defn arity-ok? [wanted actual]
-  (cond (= wanted :arbitrary) true
-        :else (contains? wanted actual)))
-
 (defn special-form? [exp]
   (if (empty? exp)
     (throw (Exception. (str "Unquoted empty list " exp)))
     (let [operator (first exp)]
       (if (a-list? operator)
         false
-        (let [{:keys [type arity] :as found}
-              (get special-forms (keyword operator))]
-          (if (not found)
-            false
-            (if (arity-ok? arity (count exp))
-              type
-              (throw (Exception. (str "Wrong arity for: " exp "\n" "Expected " arity))))))))))
+        (get special-forms (keyword operator))))))
 
 ;; Quotations have the form (quote <text-of-quotation>)
 (defn text-of-quotation [exp]
@@ -78,6 +68,9 @@
 
 (defn assignment-value [exp]
   (last exp))
+
+(defn make-assignment [var value]
+  (list 'set! var value))
 
 ;; Definitions have the form (define <var> <value>)
 ;; or the form (define (<var> <parameter-1> ... <parameter-n>) <body>)
@@ -227,21 +220,25 @@
         (list (make-lambda () (list define-exp call-exp))))
       (conj values f))))
 
+(defn make-let-bindings [vars values]
+  (partition-all 2 (interleave vars values)))
+
 ;; Let* is similar to let, except that the bindings of the let* variables are
 ;; performed sequentially from left to right, and each binding is made in an
 ;; environment in which all of the preceding bindings are visible
 (defn make-let [bindings body]
-  (list 'let bindings body))
+  (-> body
+      (conj bindings)
+      (conj  'let)))
 
 (defn let*->nested-lets [exp]
-  (let [reverse-bindings (reverse (second exp))
-        body (last exp)]
-    (loop [reverse-bindings reverse-bindings body body]
-      (let [let-exp (make-let (list (first reverse-bindings)) body)
-            new-reverse-bindings (next reverse-bindings)] 
-        (if (seq new-reverse-bindings)
-          (recur new-reverse-bindings let-exp)
-          let-exp)))))
+  (loop [reverse-bindings (reverse (let-bindings exp))
+         body (let-body exp)]
+    (let [let-exp (list (make-let (list (first reverse-bindings)) body))
+          new-reverse-bindings (next reverse-bindings)] 
+      (if (seq new-reverse-bindings)
+        (recur new-reverse-bindings let-exp)
+        (first let-exp)))))
 
 ;; while has the following syntax
 ;; (while cond exps)

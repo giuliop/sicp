@@ -84,21 +84,6 @@
       (eval-exp (syn/if-consequent exp) *env*)
       (eval-exp (syn/if-alternative exp) *env*))))
 
-(defn make-procedure [parameters body *env*]
-  (list 'procedure parameters body *env*))
-
-(defmethod eval-exp :procedure [exp *env*]
-  (make-procedure (syn/lambda-params exp) (syn/lambda-body exp) *env*))
-
-(defn eval-sequence [actions *env*]
-  (let [first-value (eval-exp (syn/first-action actions) *env*)]
-    (if (syn/last-action? actions)
-      first-value
-      (recur (syn/rest-actions actions) *env*))))
-
-(defmethod eval-exp :list-of-actions [exp *env*]
-  (eval-sequence (syn/sequence-actions exp) *env*))
-
 (defmethod eval-exp :cond [exp *env*]
   (eval-exp (syn/cond->if exp) *env*))
 
@@ -147,6 +132,31 @@
       (conj tail-exps exp) *env*)))
 
 (def list-of-values list-of-values-left-eval-exp)
+
+(defn eval-sequence [actions *env*]
+  (let [first-value (eval-exp (syn/first-action actions) *env*)]
+    (if (syn/last-action? actions)
+      first-value
+      (recur (syn/rest-actions actions) *env*))))
+
+(defmethod eval-exp :list-of-actions [exp *env*]
+  (eval-sequence (syn/sequence-actions exp) *env*))
+
+(defn scan-out-defines [body]
+  (let [definition? #(= :definition (syn/special-form? %))
+        def-exps (filter definition? body)
+        def-vars (map syn/definition-variable def-exps)
+        def-values (map syn/definition-value def-exps)
+        body (remove definition? body)]
+    (syn/make-let (syn/make-let-bindings def-vars
+                                         (repeat (count def-vars) ''_*unbound*_ ))
+                  (concat (map syn/make-assignment def-vars def-values) body))))
+
+(defn make-procedure [parameters body *env*]
+  (list 'procedure parameters body *env*))
+
+(defmethod eval-exp :procedure [exp *env*]
+  (make-procedure (syn/lambda-params exp) (syn/lambda-body exp) *env*))
 
 (defn compound-procedure? [p]
   (and (list? p) (= 'procedure (first p))))
