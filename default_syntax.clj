@@ -4,7 +4,9 @@
   (or (number? exp)
       (string? exp)
       (= false exp)
-      (= true exp)))
+      (= true exp)
+      (= nil exp)
+      ))
 
 (defn variable? [exp]
   (symbol? exp))

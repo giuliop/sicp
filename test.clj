@@ -99,3 +99,11 @@
                ('exp1) ('exp2) ('exp3))]
    (is (= out (interpreter/scan-out-defines (default-syntax/lambda-body in)))))
   )
+
+(deftest lambda
+  (ev '(define (map f xs)
+         (if (null? xs) nil
+             (cons (f (car xs))
+                   (map f (cdr xs)))))
+   )
+  (is (= '(4 9 16 25) (ev '(map (lambda (x) (* x x)) '(2 3 4 5))))))
