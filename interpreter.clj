@@ -34,11 +34,11 @@
 (defn lookup-variable-value [var env]
   (let [value (env/var-value var env)
         next (env/enclosing-environment env)]
-    (if (not= value :not-found)
-      value
-      (if (not= next env/the-empty-environment)
-        (recur var @next)
-        (throw (Exception. (str "Unbound variable " var)))))))
+    (cond (= value '_*unbound*_) (throw (Exception. (str "Unbound var " var)))
+          (= value :not-found) (if (not= next env/the-empty-environment)
+                                 (recur var @next)
+                                 (throw (Exception. (str "Unbound var " var))))
+          :else value)))
 
 (defmethod eval-exp :variable [exp *env*] 
   (lookup-variable-value exp @*env*))

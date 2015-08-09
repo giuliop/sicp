@@ -58,6 +58,5 @@
 (defn louis-operands [exp]
   (drop 2 exp))
 
-; 4.3 - 4.15
-; see interpreter.clj
+; see interpreter.clj for all exercises not answered here. It is a functioning Scheme interprester in Clojure that implements what asked by SICP
 
