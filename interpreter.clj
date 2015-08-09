@@ -34,7 +34,7 @@
 (defn lookup-variable-value [var env]
   (let [value (env/var-value var env)
         next (env/enclosing-environment env)]
-    (if (not= value '_*unbound*_)
+    (if (not= value :not-found)
       value
       (if (not= next env/the-empty-environment)
         (recur var @next)
@@ -49,7 +49,7 @@
 (defn set-variable-value! [var value *env*]
   (cond (= *env* env/the-empty-environment)
           (throw (Exception. (str "Unbound variable " var)))
-        (not= '_*unbound*_ (env/var-value var @*env*))
+        (not= :not-found (env/var-value var @*env*))
           (env/modify! var value *env*)
         :else (recur var value (env/enclosing-environment @*env*))))
 
@@ -144,16 +144,19 @@
 
 (defn scan-out-defines [body]
   (let [definition? #(= :definition (syn/special-form? %))
-        def-exps (filter definition? body)
-        def-vars (map syn/definition-variable def-exps)
-        def-values (map syn/definition-value def-exps)
-        body (remove definition? body)]
-    (syn/make-let (syn/make-let-bindings def-vars
-                                         (repeat (count def-vars) ''_*unbound*_ ))
-                  (concat (map syn/make-assignment def-vars def-values) body))))
+        def-exps (filter definition? body)]
+    (if-not (seq def-exps)
+      body
+      (let [def-vars (map syn/definition-variable def-exps)
+            def-values (map syn/definition-value def-exps)
+            body (remove definition? body)]
+        (list (syn/make-let
+               (syn/make-let-bindings def-vars
+                                      (repeat (count def-vars) ''_*unbound*_ ))
+               (concat (map syn/make-assignment def-vars def-values) body)))))))
 
 (defn make-procedure [parameters body *env*]
-  (list 'procedure parameters body *env*))
+  (list 'procedure parameters (scan-out-defines body) *env*))
 
 (defmethod eval-exp :procedure [exp *env*]
   (make-procedure (syn/lambda-params exp) (syn/lambda-body exp) *env*))

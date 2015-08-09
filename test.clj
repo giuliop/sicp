@@ -89,21 +89,22 @@
 
 (deftest scan-out-defines
   (let [in '(lambda (a b)
-                        (define x 5)
-                        (define y (* 2 a))
-                        ('exp1) ('exp2) ('exp3))
-        out '(let ((x '_*unbound*_)
-                   (y '_*unbound*_))
-               (set! x 5)
-               (set! y (* 2 a))
-               ('exp1) ('exp2) ('exp3))]
-   (is (= out (interpreter/scan-out-defines (default-syntax/lambda-body in)))))
-  )
+                    (define x 5)
+                    (define y (* 2 a))
+                    ('exp1) ('exp2) ('exp3))
+        out '((let ((x '_*unbound*_)
+                     (y '_*unbound*_))
+                 (set! x 5)
+                 (set! y (* 2 a))
+                 ('exp1) ('exp2) ('exp3)))]
+    (is (= out (interpreter/scan-out-defines (default-syntax/lambda-body in)))))
+  (let [in '(lambda (x) (newline) x)
+        out '((newline) x)]
+    (is (= out (interpreter/scan-out-defines (default-syntax/lambda-body in))))))
 
 (deftest lambda
   (ev '(define (map f xs)
          (if (null? xs) nil
              (cons (f (car xs))
-                   (map f (cdr xs)))))
-   )
+                   (map f (cdr xs))))))
   (is (= '(4 9 16 25) (ev '(map (lambda (x) (* x x)) '(2 3 4 5))))))

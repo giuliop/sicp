@@ -53,12 +53,14 @@
   (map #(list 'primitive %1) (take-nth 2 (drop 1 primitives))))
 
 (defn special-form? [exp]
-  (if (empty? exp)
-    (throw (Exception. (str "Unquoted empty list " exp)))
-    (let [operator (first exp)]
-      (if (a-list? operator)
-        false
-        (get special-forms (keyword operator))))))
+  (if-not (a-list? exp)
+    false
+    (if (empty? exp)
+      (throw (Exception. (str "Unquoted empty list " exp)))
+      (let [operator (first exp)]
+        (if (a-list? operator)
+          false
+          (get special-forms (keyword operator)))))))
 
 ;; Quotations have the form (quote <text-of-quotation>)
 (defn text-of-quotation [exp]
