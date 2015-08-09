@@ -60,3 +60,24 @@
 
 ; see interpreter.clj for all exercises not answered here. It is a functioning Scheme interprester in Clojure that implements what asked by SICP
 
+; 4.21
+; a
+(comment
+  ((lambda (n)
+           ((lambda (fib)
+                    (fib fib 1 0 n))
+            (lambda (fb a b count)
+                    (if (= 0 count) b
+                      (fb fb (+ a b) a (- count 1)))))) 10)
+  )
+
+; b
+(comment
+  (define (f x)
+    ((lambda (even? odd?)
+             (even? even? odd? x))
+     (lambda (ev? od? n)
+             (if (= n 0) 'true (od? ev? od? (- n 1))))
+     (lambda (ev? od? n)
+             (if (= n 0) 'false (ev? ev? od? (- n 1))))))
+  )

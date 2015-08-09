@@ -26,6 +26,7 @@
                       :and :and
                       :let :let
                       :let* :let*
+                      :letrec :letrec
                       :while :while
                       })
 
@@ -243,6 +244,14 @@
       (if (seq new-reverse-bindings)
         (recur new-reverse-bindings let-exp)
         (first let-exp)))))
+
+(defn letrec->let [exp]
+  (let [vars (let-vars exp)
+        values (let-values exp)
+        body (let-body exp)
+        new-bindings (make-let-bindings vars (repeat (count vars) ''_*undefined*_))
+        set-exps (map make-assignment vars values)]
+    (make-let new-bindings (into body (reverse set-exps)))))
 
 ;; while has the following syntax
 ;; (while cond exps)

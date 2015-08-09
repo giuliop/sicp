@@ -34,7 +34,7 @@
 (defn lookup-variable-value [var env]
   (let [value (env/var-value var env)
         next (env/enclosing-environment env)]
-    (cond (= value '_*unbound*_) (throw (Exception. (str "Unbound var " var)))
+    (cond (= value '_*undefined*_) (throw (Exception. (str "Undefined var " var)))
           (= value :not-found) (if (not= next env/the-empty-environment)
                                  (recur var @next)
                                  (throw (Exception. (str "Unbound var " var))))
@@ -112,6 +112,9 @@
 (defmethod eval-exp :let* [exp env]
   (eval-exp (syn/let*->nested-lets exp) env))
 
+(defmethod eval-exp :letrec [exp env]
+  (eval-exp (syn/letrec->let exp) env))
+
 (defmethod eval-exp :while [exp *env*]
   (eval-exp (syn/while->lambda exp) *env*))
 
@@ -152,7 +155,7 @@
             body (remove definition? body)]
         (list (syn/make-let
                (syn/make-let-bindings def-vars
-                                      (repeat (count def-vars) ''_*unbound*_ ))
+                                      (repeat (count def-vars) ''_*undefined*_ ))
                (concat (map syn/make-assignment def-vars def-values) body)))))))
 
 (defn make-procedure [parameters body *env*]

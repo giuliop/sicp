@@ -66,18 +66,33 @@
   )
 
 (def named-let-fib '(define (fib n)
-                  (let fib-iter ((a 1)
-                                 (b 0)
-                                 (count n))
-                       (if (= count 0)
-                         b
-                         (fib-iter (+ a b) a (- count 1))))))
+                      (let fib-iter ((a 1)
+                                     (b 0)
+                                     (count n))
+                           (if (= count 0)
+                             b
+                             (fib-iter (+ a b) a (- count 1))))))
+
+(deftest letrec->let
+  (let [in '(letrec ((a a-value) (b b-value) (c c-value))
+                    (exp1) (exp2) (exp3))
+        out '(let ((a '_*undefined*_) (b '_*undefined*_) (c '_*undefined*_))
+               (set! a a-value)
+               (set! b b-value)
+               (set! c c-value)
+               (exp1) (exp2) (exp3))]
+    (is (= out (default-syntax/letrec->let in)))))
 
 (deftest let-forms
   (testing "normal let"
     (is (= 10 (ev '(let ((x 5) (y 15)) (- y x))))))
   (testing "let star"
     (is (= 10 (ev '(let* ((x 5) (y (+ 10 x))) (- y x))))))
+  (testing "letrec"
+    (is (= 3628800) (ev '(letrec ((fact (lambda (n)
+                                                (if (= n 1) 1
+                                                    (* n (fact (- n 1)))))))
+                                 (fact 10)))))
   (testing "named-let"
     (ev named-let-fib)
     (is (= 8 (ev '(fib 6))))))
@@ -92,8 +107,8 @@
                     (define x 5)
                     (define y (* 2 a))
                     ('exp1) ('exp2) ('exp3))
-        out '((let ((x '_*unbound*_)
-                     (y '_*unbound*_))
+        out '((let ((x '_*undefined*_)
+                    (y '_*undefined*_))
                  (set! x 5)
                  (set! y (* 2 a))
                  ('exp1) ('exp2) ('exp3)))]
@@ -108,3 +123,24 @@
              (cons (f (car xs))
                    (map f (cdr xs))))))
   (is (= '(4 9 16 25) (ev '(map (lambda (x) (* x x)) '(2 3 4 5))))))
+
+(deftest Y-operator
+  "testing even-odd"
+  (ev '(define (f x)
+         ((lambda (even? odd?)
+                  (even? even? odd? x))
+          (lambda (ev? od? n)
+                  (if (= n 0) 'true (od? ev? od? (- n 1))))
+          (lambda (ev? od? n)
+                  (if (= n 0) 'false (ev? ev? od? (- n 1)))))))
+  (is (= true (ev '(f 10))))
+  (is (= false (ev '(f 1))))
+  (is (= true (ev '(f 0))))
+  "testing fib"
+  (ev '(define Y-fib (lambda (n)
+                            ((lambda (fib)
+                                     (fib fib 1 0 n))
+                             (lambda (fb a b count)
+                                     (if (= 0 count) b
+                                         (fb fb (+ a b) a (- count 1))))))))
+  (is (= 55 (ev '(Y-fib 10)))))
