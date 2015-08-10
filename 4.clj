@@ -58,7 +58,9 @@
 (defn louis-operands [exp]
   (drop 2 exp))
 
-; see interpreter.clj for all exercises not answered here. It is a functioning Scheme interprester in Clojure that implements what asked by SICP
+; see the various interpreter.clj for all exercises not answered here. They are functioning Scheme interpreters in Clojure that implements what asked by SICP.
+; interpreter-main is the initial onw
+; interpreter-analyze-then-execute splits analysis and execution as per section 4.1.7
 
 ; 4.21
 ; a
@@ -81,3 +83,16 @@
      (lambda (ev? od? n)
              (if (= n 0) 'false (ev? ev? od? (- n 1))))))
   )
+
+; 4 .25
+
+; In an applcative-order Scheme it (fact 5) would cause an infinite loop in the expression (* n (factorial (- n 1))) with n assuming infinite negative values.
+; In a noraml order-language it would work since (* n (factorial (- n 1))) would not be evaluated for n = 1
+
+; 4.26
+
+; unless can easily be derived from if inverting the two expressions
+
+; imagine a situation where we have a list of data points and another list with control values that indicate when the data points are cottupted.
+; unless could be used together with map to range over the data points, control values and a list of defalut values and  only take the data ponins over
+; the default values when the former are not corrupted
