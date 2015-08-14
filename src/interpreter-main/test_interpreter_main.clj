@@ -1,5 +1,5 @@
-(ns test
-  (:require [interpreter :refer (eval-exp the-global-environment
+(ns test-interpreter-main
+  (:require [interpreter-main :refer (eval-exp the-global-environment
                                           reset-global-environment!)]
             [clojure.test :refer :all]))
 

@@ -1,4 +1,4 @@
-(ns interpreter-environment)
+(ns environment)
 
 ;; an environment is a map of :vars values and a special key
 ;; 'next whose value is the enclosing environment. The 'next key

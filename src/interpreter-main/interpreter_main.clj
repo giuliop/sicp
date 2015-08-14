@@ -1,6 +1,6 @@
-(ns interpreter
+(ns interpreter-main
   (:require [default-syntax :as syn]
-            [interpreter-environment :as env]))
+            [environment :as env]))
 
 (defmacro invariant [& exps]
   `{:pre [~@exps]
