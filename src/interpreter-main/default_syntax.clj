@@ -130,6 +130,7 @@
 (defn last-action? [seq] (nil? (next seq)))
 (defn first-action [seq] (first seq))
 (defn rest-actions [seq] (next seq))
+(defn empty-actions? [seq] (nil? seq))
 
 (defn sequence->exp [seq]
   (case (count seq)

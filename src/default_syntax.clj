@@ -21,13 +21,13 @@
                       :if :if
                       :lambda :procedure
                       :begin :list-of-actions
-                      ;; :cond :cond
-                      ;; :or :or
-                      ;; :and :and
+                      :cond :cond
+                      :or :or
+                      :and :and
                       :let :let
-                      ;; :let* :let*
-                      ;; :letrec :letrec
-                      ;; :while :while
+                      :let* :let*
+                      :letrec :letrec
+                      :while :while
                       })
 
 (def primitives [
