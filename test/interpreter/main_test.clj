@@ -81,7 +81,7 @@
                (set! b b-value)
                (set! c c-value)
                (exp1) (exp2) (exp3))]
-    (is (= out (default-syntax/letrec->let in)))))
+    (is (= out (interpreter.default-syntax/letrec->let in)))))
 
 (deftest let-forms
   (testing "normal let"
@@ -112,10 +112,10 @@
                  (set! x 5)
                  (set! y (* 2 a))
                  ('exp1) ('exp2) ('exp3)))]
-    (is (= out (interpreter/scan-out-defines (default-syntax/lambda-body in)))))
+    (is (= out (interpreter.main/scan-out-defines (interpreter.default-syntax/lambda-body in)))))
   (let [in '(lambda (x) (newline) x)
         out '((newline) x)]
-    (is (= out (interpreter/scan-out-defines (default-syntax/lambda-body in))))))
+    (is (= out (interpreter.main/scan-out-defines (interpreter.default-syntax/lambda-body in))))))
 
 (deftest lambda
   (ev '(define (map f xs)

@@ -113,10 +113,10 @@
                  (set! x 5)
                  (set! y (* 2 a))
                  ('exp1) ('exp2) ('exp3)))]
-    (is (= out (interpreter/scan-out-defines (default-syntax/lambda-body in)))))
+    (is (= out (interpreter.analyze-then-execute/scan-out-defines (interpreter.default-syntax/lambda-body in)))))
   (let [in '(lambda (x) (newline) x)
         out '((newline) x)]
-    (is (= out (interpreter/scan-out-defines (default-syntax/lambda-body in))))))
+    (is (= out (interpreter.analyze-then-execute/scan-out-defines (interpreter.default-syntax/lambda-body in))))))
 
 (deftest lambda
   (ev '(define (map f xs)
