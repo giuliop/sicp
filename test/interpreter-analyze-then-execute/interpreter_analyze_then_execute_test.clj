@@ -1,6 +1,6 @@
-(ns test-interpreter-main
-  (:require [interpreter-main :refer (eval-exp the-global-environment
-                                          reset-global-environment!)]
+(ns interpreter-analyze-then-execute-test
+  (:require [interpreter-analyze-then-execute :refer (eval-exp the-global-environment
+                                                               reset-global-environment!)]
             [clojure.test :refer :all]))
 
 (defn ev [exp]
@@ -9,7 +9,7 @@
 (defn setup [f]
   (reset-global-environment!)
   (f)
-(reset-global-environment!))
+  (reset-global-environment!))
 
 (use-fixtures :each setup)
 
@@ -48,59 +48,60 @@
   (testing "if"
     (is (= 0 (ev '(if false 1 0))))
     (is (= 1 (ev '(if true 1 0)))))
-  (testing "cond"
-    (is (= 0 (ev '(cond (false 1)
-                        (false 2)
-                        (else 0)))))
-    (is (= 1 (ev '(cond (true 1)
-                        (else 0))))))
+  ;; (testing "cond"
+  ;;   (is (= 0 (ev '(cond (false 1)
+  ;;                       (false 2)
+  ;;                       (else 0)))))
+  ;;   (is (= 1 (ev '(cond (true 1)
+  ;;                       (else 0))))))
   )
 
-(deftest and-or
-  (is (= 'ok (ev '(and 1 1 'ok))))
-  (is (= false (ev '(and 1 (= 3 5) 'ok))))
-  (is (= true (ev '(and))))
-  (is (= 'ok (ev '(or false 'ok true))))
-  (is (= false (ev '(or false (= 3 5)))))
-  (is (= false (ev '(or))))
-  )
+;; (deftest and-or
+;;   (is (= 'ok (ev '(and 1 1 'ok))))
+;;   (is (= false (ev '(and 1 (= 3 5) 'ok))))
+;;   (is (= true (ev '(and))))
+;;   (is (= 'ok (ev '(or false 'ok true))))
+;;   (is (= false (ev '(or false (= 3 5)))))
+;;   (is (= false (ev '(or))))
+;;   )
 
-(def named-let-fib '(define (fib n)
-                      (let fib-iter ((a 1)
-                                     (b 0)
-                                     (count n))
-                           (if (= count 0)
-                             b
-                             (fib-iter (+ a b) a (- count 1))))))
+;; (def named-let-fib '(define (fib n)
+;;                       (let fib-iter ((a 1)
+;;                                      (b 0)
+;;                                      (count n))
+;;                            (if (= count 0)
+;;                              b
+;;                              (fib-iter (+ a b) a (- count 1))))))
 
-(deftest letrec->let
-  (let [in '(letrec ((a a-value) (b b-value) (c c-value))
-                    (exp1) (exp2) (exp3))
-        out '(let ((a '_*undefined*_) (b '_*undefined*_) (c '_*undefined*_))
-               (set! a a-value)
-               (set! b b-value)
-               (set! c c-value)
-               (exp1) (exp2) (exp3))]
-    (is (= out (default-syntax/letrec->let in)))))
+;; (deftest letrec->let
+;;   (let [in '(letrec ((a a-value) (b b-value) (c c-value))
+;;                     (exp1) (exp2) (exp3))
+;;         out '(let ((a '_*undefined*_) (b '_*undefined*_) (c '_*undefined*_))
+;;                (set! a a-value)
+;;                (set! b b-value)
+;;                (set! c c-value)
+;;                (exp1) (exp2) (exp3))]
+;;     (is (= out (default-syntax/letrec->let in)))))
 
 (deftest let-forms
   (testing "normal let"
     (is (= 10 (ev '(let ((x 5) (y 15)) (- y x))))))
-  (testing "let star"
-    (is (= 10 (ev '(let* ((x 5) (y (+ 10 x))) (- y x))))))
-  (testing "letrec"
-    (is (= 3628800) (ev '(letrec ((fact (lambda (n)
-                                                (if (= n 1) 1
-                                                    (* n (fact (- n 1)))))))
-                                 (fact 10)))))
-  (testing "named-let"
-    (ev named-let-fib)
-    (is (= 8 (ev '(fib 6))))))
+  ;; (testing "let star"
+  ;;   (is (= 10 (ev '(let* ((x 5) (y (+ 10 x))) (- y x))))))
+  ;; (testing "letrec"
+  ;;   (is (= 3628800) (ev '(letrec ((fact (lambda (n)
+  ;;                                               (if (= n 1) 1
+  ;;                                                   (* n (fact (- n 1)))))))
+  ;;                                (fact 10)))))
+  ;; (testing "named-let"
+  ;;   (ev named-let-fib)
+  ;;   (is (= 8 (ev '(fib 6)))))
+)
 
-(deftest while-form
-  (is (= 15 (ev '(let ((x 5) (y 10))
-                   (while (> x 0) (set! y (+ y 1)) (set! x (- x 1)))
-                   y)))))
+;; (deftest while-form
+;;   (is (= 15 (ev '(let ((x 5) (y 10))
+;;                    (while (> x 0) (set! y (+ y 1)) (set! x (- x 1)))
+;;                    y)))))
 
 (deftest scan-out-defines
   (let [in '(lambda (a b)
