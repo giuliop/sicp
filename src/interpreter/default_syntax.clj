@@ -1,4 +1,4 @@
-(ns default-syntax)
+(ns interpreter.default-syntax)
 
 (defn self-evaluating? [exp]
   (or (number? exp)
