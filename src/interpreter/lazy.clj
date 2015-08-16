@@ -1,4 +1,4 @@
-(ns interpreter.main
+(ns interpreter.lazy
   (:require [interpreter.default-syntax :as syn]
             [interpreter.environment :as env]))
 
