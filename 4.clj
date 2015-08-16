@@ -31,12 +31,12 @@
 
 ; test them with print, expect to see 123 and 321 for left and right eval
 ; respectively
-(def list-of-print-values '((print 1) (print 2) (print 3)))
-(def env ())
 (defn test4-1 []
-  (list-of-values-left-eval list-of-print-values env)
-  (println)
-  (list-of-values-right-eval list-of-print-values env))
+  (let [list-of-print-values '((print 1) (print 2) (print 3))
+        env ()]
+    (list-of-values-left-eval list-of-print-values env)
+    (println)
+    (list-of-values-right-eval list-of-print-values env)))
 
 ; 4.2
 ; a
@@ -84,6 +84,34 @@
              (if (= n 0) 'false (ev? ev? od? (- n 1))))))
   )
 
+; 4.24
+(defn timing-tests []
+  (require 'interpreter.main)
+  (require 'interpreter.analyze-then-execute)
+  (letfn [(e1 [exp] (interpreter.main/eval-exp
+                     exp interpreter.main/the-global-environment))
+          (e2 [exp] (interpreter.analyze-then-execute/eval-exp
+                     exp interpreter.analyze-then-execute/the-global-environment))
+          (compare [exp] (println exp) (print "Main interpreter -> ") (time (e1 exp))
+                   (print "Analyze--execute -> ") (time (e2 exp)))]
+    (interpreter.main/reset-global-environment!)
+    (interpreter.analyze-then-execute/reset-global-environment!)
+    (let [def-exps ['(define (range n)
+                   (define (loop lst next)
+                     (if (< next 0)
+                       lst
+                       (loop (cons next lst) (- next 1))))
+                   (loop '() n))
+                '(define (map f xs)
+                  (if (null? xs) nil
+                      (cons (f (car xs))
+                            (map f (cdr xs)))))
+                '(define (mapsquare n)
+                   (map (lambda (x) (* x x)) (range n)))]
+          time-exps ['(mapsquare 500)]]
+      (doseq [x def-exps] (e1 x) (e2 x))
+      (doseq [x time-exps] (compare x)))))
+
 ; 4 .25
 
 ; In an applcative-order Scheme it (fact 5) would cause an infinite loop in the expression (* n (factorial (- n 1))) with n assuming infinite negative values.
@@ -91,7 +119,7 @@
 
 ; 4.26
 
-; unless can easily be derived from if inverting the two expressions
+; unless can easily be derived from if inverting the "true" and "false" expressions
 
 ; imagine a situation where we have a list of data points and another list with control values that indicate when the data points are cottupted.
 ; unless could be used together with map to range over the data points, control values and a list of defalut values and  only take the data ponins over
