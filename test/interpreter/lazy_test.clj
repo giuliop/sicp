@@ -6,6 +6,9 @@
 (defn ev [exp]
   (eval-exp exp the-global-environment))
 
+(defn act [exp]
+  (interpreter.lazy/actual-value exp the-global-environment))
+
 (defn setup [f]
   (reset-global-environment!)
   (f)
@@ -95,7 +98,7 @@
                                  (fact 10)))))
   (testing "named-let"
     (ev named-let-fib)
-    (is (= 8 (ev '(fib 6))))))
+    (is (= 8 (act '(fib 6))))))
 
 (deftest while-form
   (is (= 15 (ev '(let ((x 5) (y 10))
@@ -143,4 +146,4 @@
                              (lambda (fb a b count)
                                      (if (= 0 count) b
                                          (fb fb (+ a b) a (- count 1))))))))
-  (is (= 55 (ev '(Y-fib 10)))))
+  (is (= 55 (act '(Y-fib 10)))))

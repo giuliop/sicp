@@ -7,10 +7,6 @@
 
 (def the-global-environment)
 
-(declare force-it)
-(defn actual-value [exp *env*]
-  (force-it (eval-exp exp *env*)))
-
 (defn thunk? [exp]
   (and (syn/a-list? exp) (= 'thunk (first exp))))
 
@@ -19,6 +15,13 @@
 
 (defn thunk-env [exp]
   (nth exp 2))
+
+(defn actual-value [exp *env*]
+  (let [exp (eval-exp exp *env*)]
+    (if (thunk? exp)
+      (recur (thunk-exp exp) (thunk-env exp))
+      exp)))
+;; (force-it (eval-exp exp *env*)))
 
 (defn evaluated-thunk? [exp]
   (and (syn/a-list? exp) (= 'evaluated-thunk (first exp))))
@@ -205,7 +208,7 @@
 
 (defn -apply [procedure arguments *env*]
   (cond (primitive-procedure? procedure)
-          (apply-primitive-procedure procedure (list-of-arg-values arguments))
+          (apply-primitive-procedure procedure (list-of-arg-values arguments *env*))
         (compound-procedure? procedure)
           (eval-sequence (procedure-body procedure)
                          (env/extend-with
