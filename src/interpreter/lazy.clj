@@ -7,6 +7,13 @@
 
 (def the-global-environment)
 
+(def memoize-thunk true)
+(defn memoize-on []
+  (alter-var-root (var memoize-thunk) (fn [x] true)))
+(defn memoize-off []
+  (alter-var-root (var memoize-thunk) (fn [x] false)))
+  
+
 (defn thunk? [exp]
   (and (syn/a-list? exp) (= 'thunk (first exp))))
 
@@ -16,12 +23,8 @@
 (defn thunk-env [exp]
   (nth exp 2))
 
-(defn actual-value [exp *env*]
-  (let [exp (eval-exp exp *env*)]
-    (if (thunk? exp)
-      (recur (thunk-exp exp) (thunk-env exp))
-      exp)))
-;; (force-it (eval-exp exp *env*)))
+(defn make-evaluated-thunk [value]
+  (list 'evaluated-thunk value))
 
 (defn evaluated-thunk? [exp]
   (and (syn/a-list? exp) (= 'evaluated-thunk (first exp))))
@@ -29,10 +32,17 @@
 (defn thunk-value [evaluated-exp]
   (second evaluated-exp))
 
-(defn force-it [exp]
-  (if (thunk? exp)
-    (actual-value (thunk-exp exp) (thunk-env exp))
-    exp))
+(defn actual-value [exp *env*]
+  ;; (force-it (eval-exp exp *env*)))
+  (let [val (eval-exp exp *env*)]
+    (cond (thunk? val)
+            (let [result (actual-value (thunk-exp val) (thunk-env val))]
+              (when memoize-thunk
+                (env/modify! exp (make-evaluated-thunk result) *env*))
+              result)
+          (evaluated-thunk? val)
+            (thunk-value val)
+          :else val)))
 
 (defn delay-it [exp *env*]
   (list 'thunk exp *env*))
@@ -90,7 +100,6 @@
 (defn define-variable! [var value *env*]
   (env/modify! var value *env*))
 
-(declare user-format)
 (defmethod eval-exp :definition [exp *env*]
   (let [var (syn/definition-variable exp)
         value (syn/definition-value exp)
@@ -223,12 +232,14 @@
     (-apply op args *env*)))
 
 (defn user-format [object]
-  (if (compound-procedure? object)
-    (list 'compound-procedure
-          (procedure-parameters object)
-          (procedure-body object)
-          '<procedure-env>)
-    object))
+  (cond (compound-procedure? object)
+          (list 'compound-procedure
+                (procedure-parameters object)
+                (procedure-body object)
+                '<procedure-env>)
+        (thunk? object)
+          (list 'thunk (thunk-exp object) '<thunk-env>')
+        :else object))
 
 (defn make-global-environment []
   (env/extend-with (syn/primitive-procedure-names)
