@@ -37,15 +37,18 @@
   (let [val (eval-exp exp *env*)]
     (cond (thunk? val)
             (let [result (actual-value (thunk-exp val) (thunk-env val))]
-              (when memoize-thunk
+              (when (= 'memo (last val))
                 (env/modify! exp (make-evaluated-thunk result) *env*))
               result)
           (evaluated-thunk? val)
             (thunk-value val)
           :else val)))
 
+(defn delay-and-memo-it [exp *env*]
+  (list 'thunk exp *env* 'memo))
+
 (defn delay-it [exp *env*]
-  (list 'thunk exp *env*))
+  (list 'thunk exp *env* 'no-memo))
 
 (defn debug-value-env [value env]
   (println value)
@@ -162,14 +165,25 @@
             exps (syn/rest-operands exps)]
         (recur res exps)))))
 
-(defn list-of-delayed-args [exps *env*]
-  (loop [res () exps exps]
-    (if (syn/no-operands? exps)
+(defn process-argument [annotation arg *env*]
+  (cond (= 'lazy annotation)
+          (delay-it arg *env*)
+        (= 'lazy-memo arg)
+          (delay-and-memo-it arg *env*)
+        :else (eval-exp arg *env*)))
+
+(defn list-of-delayed-args [annotations args *env*]
+  (loop [res ()
+         annotations annotations
+         args args]
+    (if (syn/no-operands? args)
       res
-      (let [value (delay-it (syn/first-operand exps) *env*)
+      (let [value (process-argument (first annotations)
+                                    (syn/first-operand args) *env*)
             res (concat res (list value))
-            exps (syn/rest-operands exps)]
-        (recur res exps)))))
+            annotations (rest annotations)
+            args (syn/rest-operands args)]
+        (recur res annotations args)))))
 
 (defn eval-sequence [actions *env*]
   (let [first-value (eval-exp (syn/first-action actions) *env*)]
@@ -202,8 +216,23 @@
 (defn compound-procedure? [p]
   (and (list? p) (= 'procedure (first p))))
 
-(defn procedure-parameters [p] (second p))
+(defn remove-annotation [param]
+  (if (list? param)
+    (first param)
+    param))
+
+(defn annotation [param]
+  (if (list? param)
+    (second param)
+    nil))
+
+(defn procedure-parameters [p] (map remove-annotation (second p)))
+
+(defn argument-annotations [p]
+  (map annotation (second p)))
+
 (defn procedure-body [p] (nth p 2))
+
 (defn procedure-environment [p] (last p))
 
 (defn primitive-procedure? [proc]
@@ -222,7 +251,8 @@
           (eval-sequence (procedure-body procedure)
                          (env/extend-with
                             (procedure-parameters procedure)
-                            (list-of-delayed-args arguments *env*)
+                            (list-of-delayed-args (argument-annotations procedure)
+                                                  arguments *env*)
                             (procedure-environment procedure)))
         :else (throw (Exception. (str "Unknown procedure type - APPLY" procedure)))))
 

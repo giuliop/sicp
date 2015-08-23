@@ -45,6 +45,7 @@
                  :cons cons
                  :display print
                  :newline newline
+                 :id identity
                  ])
 
 (defn primitive-procedure-names []
