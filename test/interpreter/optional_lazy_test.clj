@@ -1,13 +1,13 @@
-(ns interpreter.lazy-test
-  (:require [interpreter.lazy :refer (the-global-environment
+(ns interpreter.optional-lazy-test
+  (:require [interpreter.optional-lazy :refer (the-global-environment
                                       reset-global-environment!)]
             [clojure.test :refer :all]))
 
 (defn ev [exp]
-  (interpreter.lazy/eval-exp exp the-global-environment))
+  (interpreter.optional-lazy/eval-exp exp the-global-environment))
 
 (defn act [exp]
-  (interpreter.lazy/actual-value exp the-global-environment))
+  (interpreter.optional-lazy/actual-value exp the-global-environment))
 
 (defn setup [f]
   (reset-global-environment!)
@@ -100,10 +100,10 @@
     (ev named-let-fib)
     (is (= 8 (act '(fib 6))))))
 
-;; (deftest while-form
-  ;; (is (= 15 (act '(let ((x 5) (y 10))
-                   ;; (while (> x 0) (set! y (+ y 1)) (set! x (- x 1)))
-                   ;; y)))))
+(deftest while-form
+  (is (= 15 (act '(let ((x 5) (y 10))
+                   (while (> x 0) (set! y (+ y 1)) (set! x (- x 1)))
+                   y)))))
 
 (deftest scan-out-defines
   (let [in '(lambda (a b)
@@ -115,10 +115,12 @@
                  (set! x 5)
                  (set! y (* 2 a))
                  ('exp1) ('exp2) ('exp3)))]
-    (is (= out (interpreter.lazy/scan-out-defines (interpreter.default-syntax/lambda-body in)))))
+    (is (= out (interpreter.optional-lazy/scan-out-defines (interpreter.default-syntax/lambda-body in)
+                ))))
   (let [in '(lambda (x) (newline) x)
         out '((newline) x)]
-    (is (= out (interpreter.lazy/scan-out-defines (interpreter.default-syntax/lambda-body in))))))
+    (is (= out (interpreter.optional-lazy/scan-out-defines (interpreter.default-syntax/lambda-body in)
+                )))))
 
 (deftest lambda
   (ev '(define (map f xs)
@@ -149,13 +151,13 @@
   (is (= 55 (act '(Y-fib 10)))))
 
 (deftest try
-  (ev '(define (try a b)
+  (ev '(define (try (a lazy) (b lazy))
           (if (= a 0) 1 b)))
   (ev '(try 0 (/ 1 0))))
 
-(deftest thunk-memoization
+(deftest thunk
   (ev '(define count 0))
-  (ev '(define (id x) (set! count (+ count 1)) x))
+  (ev '(define (id (x lazy)) (set! count (+ count 1)) x))
   (ev '(define w (id (id 10))))
   (is (= 1 (act 'count)))
   (is (= 10 (act 'w)))
@@ -164,7 +166,7 @@
 
 (deftest optional-lazyness
   (ev '(define count 0))
-  (ev '(define f a (b lazy) c (d lazy-memo)
+  (ev '(define (f a (b lazy) c (d lazy-memo))
          (id a) (id a)
          (id b) (id b)
          (id c) (id c)
@@ -174,5 +176,5 @@
           (set! count (+ count 1))
           (set! count (+ count 1))
           (set! count (+ count 1))))
-  (is (= 5 (act 'count)))
+  (is (= 5 (ev 'count)))
   )

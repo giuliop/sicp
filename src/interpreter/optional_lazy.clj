@@ -1,4 +1,4 @@
-(ns interpreter.lazy
+(ns interpreter.optional-lazy
   (:require [interpreter.default-syntax :as syn]
             [interpreter.environment :as env]))
 
@@ -168,7 +168,7 @@
 (defn process-argument [annotation arg *env*]
   (cond (= 'lazy annotation)
           (delay-it arg *env*)
-        (= 'lazy-memo arg)
+        (= 'lazy-memo annotation)
           (delay-and-memo-it arg *env*)
         :else (eval-exp arg *env*)))
 
