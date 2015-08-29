@@ -80,7 +80,13 @@
   (lookup-variable-value exp @*env*))
 
 (defmethod eval-exp :quotation [exp *env*]
-  (syn/text-of-quotation exp))
+  (let [x (syn/text-of-quotation exp)]
+       (cond (= () x) ()
+             (syn/a-list? x)
+               (eval-exp (list 'cons
+                               (list 'quote (first x))
+                               (list 'quote (rest x))) *env*)
+             :else x)))
 
 (defn set-variable-value! [var value *env*]
   (cond (= *env* env/the-empty-environment)

@@ -162,3 +162,26 @@
   (is (= 2 (act 'count)))
   )
 
+(deftest list-as-streams
+  (ev '(define (cons x y)
+          (lambda (m) (m x y))))
+  (ev '(define (car z)
+         (z (lambda (x y) x))))
+  (ev '(define (cdr z)
+         (z (lambda (x y) y))))
+  (ev '(define (add-lists list1 list2)
+         (cond ((null? list1) list2)
+               ((null? list2) list1)
+               (else (cons (+ (car list1) (car list2))
+                           (add-lists (cdr list1) (cdr list2)))))))
+  (ev '(define (list-ref items n)
+         (if (= n 0)
+           (car items)
+           (list-ref (cdr items) (- n 1)))))
+  (ev '(define ones
+         (cons 1 ones)))
+  (ev '(define integers
+         (cons 1 (add-lists ones integers))))
+  (is (= 18 (act '(list-ref integers 17))))
+  (is (= 'a (act '(car '(a b c)))))
+)
