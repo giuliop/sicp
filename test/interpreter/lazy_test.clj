@@ -1,6 +1,8 @@
 (ns interpreter.lazy-test
   (:require [interpreter.lazy :refer (the-global-environment
-                                      reset-global-environment!)]
+                                      reset-global-environment!
+                                      scan-out-defines
+                                      user-format)]
             [clojure.test :refer :all]))
 
 (defn ev [exp]
@@ -12,60 +14,60 @@
 (defn setup [f]
   (reset-global-environment!)
   (f)
-(reset-global-environment!))
+  (reset-global-environment!))
 
 (use-fixtures :each setup)
 
 (deftest self-evaluating
   (testing "numbers"
-    (is (= 3 (ev '3)))
-    (is (= 0 (ev '0)))
-    (is (= 7.5 (ev '7.5)))
-    (is (= 3/2 (ev '3/2)))
-    (is (= -35.4 (ev '-35.4))))
+    (is (= 3 (act '3)))
+    (is (= 0 (act '0)))
+    (is (= 7.5 (act '7.5)))
+    (is (= 3/2 (act '3/2)))
+    (is (= -35.4 (act '-35.4))))
   (testing "strings"
-    (is (= "" (ev '"")))
-    (is (= "hello dude!" (ev '"hello dude!"))))
+    (is (= "" (act '"")))
+    (is (= "hello dude!" (act '"hello dude!"))))
   (testing "booleans"
-    (is (= false (ev 'false)))
-    (is (= false (ev ''false)))
-    ;; (is (= false (ev '#f)))
-    (is (= true (ev ''true)))
-    (is (= true (ev 'true)))
-    ;; (is (= true (ev '#t)))
+    (is (= false (act 'false)))
+    (is (= false (act ''false)))
+    ;; (is (= false (act '#f)))
+    (is (= true (act ''true)))
+    (is (= true (act 'true)))
+    ;; (is (= true (act '#t)))
   ))
 
 (deftest quote
-  (is (= 'hello (ev '(quote hello))))
-  (is (= '(quote (quote 2)) (ev '(quote (quote (quote 2))))))
+  (is (= 'hello (act '(quote hello))))
+  (is (= '''2 (user-format (act '(quote (quote (quote 2)))))))
   )
 
 (deftest assignment
   (is (thrown? Exception (ev '(set! x 10))))
   (ev '(define x 5))
-  (is (= 5 (ev 'x)))
+  (is (= 5 (act 'x)))
   (is (= "x : 10" (ev '(set! x 10))))
   )
 
 (deftest conditional
   (testing "if"
-    (is (= 0 (ev '(if false 1 0))))
-    (is (= 1 (ev '(if true 1 0)))))
+    (is (= 0 (act '(if false 1 0))))
+    (is (= 1 (act '(if true 1 0)))))
   (testing "cond"
-    (is (= 0 (ev '(cond (false 1)
+    (is (= 0 (act '(cond (false 1)
                         (false 2)
                         (else 0)))))
-    (is (= 1 (ev '(cond (true 1)
+    (is (= 1 (act '(cond (true 1)
                         (else 0))))))
   )
 
 (deftest and-or
-  (is (= 'ok (ev '(and 1 1 'ok))))
-  (is (= false (ev '(and 1 (= 3 5) 'ok))))
-  (is (= true (ev '(and))))
-  (is (= 'ok (ev '(or false 'ok true))))
-  (is (= false (ev '(or false (= 3 5)))))
-  (is (= false (ev '(or))))
+  (is (= 'ok (act '(and 1 1 'ok))))
+  (is (= false (act '(and 1 (= 3 5) 'ok))))
+  (is (= true (act '(and))))
+  (is (= 'ok (act '(or false 'ok true))))
+  (is (= false (act '(or false (= 3 5)))))
+  (is (= false (act '(or))))
   )
 
 (def named-let-fib '(define (fib n)
@@ -88,11 +90,11 @@
 
 (deftest let-forms
   (testing "normal let"
-    (is (= 10 (ev '(let ((x 5) (y 15)) (- y x))))))
+    (is (= 10 (act '(let ((x 5) (y 15)) (- y x))))))
   (testing "let star"
-    (is (= 10 (ev '(let* ((x 5) (y (+ 10 x))) (- y x))))))
+    (is (= 10 (act '(let* ((x 5) (y (+ 10 x))) (- y x))))))
   (testing "letrec"
-    (is (= 3628800) (ev '(letrec ((fact (lambda (n)
+    (is (= 3628800) (act '(letrec ((fact (lambda (n)
                                                 (if (= n 1) 1
                                                     (* n (fact (- n 1)))))))
                                  (fact 10)))))
@@ -105,7 +107,7 @@
                    ;; (while (> x 0) (set! y (+ y 1)) (set! x (- x 1)))
                    ;; y)))))
 
-(deftest scan-out-defines
+(deftest scan-out-defines-from-functions
   (let [in '(lambda (a b)
                     (define x 5)
                     (define y (* 2 a))
@@ -115,17 +117,27 @@
                  (set! x 5)
                  (set! y (* 2 a))
                  ('exp1) ('exp2) ('exp3)))]
-    (is (= out (interpreter.lazy/scan-out-defines (interpreter.default-syntax/lambda-body in)))))
+    (is (= out (scan-out-defines (interpreter.default-syntax/lambda-body in)))))
   (let [in '(lambda (x) (newline) x)
         out '((newline) x)]
-    (is (= out (interpreter.lazy/scan-out-defines (interpreter.default-syntax/lambda-body in))))))
+    (is (= out (scan-out-defines (interpreter.default-syntax/lambda-body in))))))
 
 (deftest lambda
   (ev '(define (map f xs)
-         (if (null? xs) nil
+         (if (null? xs) '()
              (cons (f (car xs))
                    (map f (cdr xs))))))
-  (is (= '(4 9 16 25) (ev '(map (lambda (x) (* x x)) '(2 3 4 5))))))
+  (ev '(define (list-ref items n)
+         (if (= n 0)
+           (car items)
+           (list-ref (cdr items) (- n 1)))))
+  (ev '(define x (map (lambda (x) (* x x)) '(2 3 4 5))))
+  (is (= 4 (act '(car x))))
+  (is (= 9 (act '(list-ref x 1))))
+  (is (= 16 (act '(list-ref x 2))))
+  (is (= 25 (act '(list-ref x 3))))
+  (is (= () (act '(cdr (cdr (cdr (cdr x)))))))
+  )
 
 (deftest Y-operator
   "testing even-odd"
@@ -136,9 +148,9 @@
                   (if (= n 0) 'true (od? ev? od? (- n 1))))
           (lambda (ev? od? n)
                   (if (= n 0) 'false (ev? ev? od? (- n 1)))))))
-  (is (= true (ev '(f 10))))
-  (is (= false (ev '(f 1))))
-  (is (= true (ev '(f 0))))
+  (is (= true (act '(f 10))))
+  (is (= false (act '(f 1))))
+  (is (= true (act '(f 0))))
   "testing fib"
   (ev '(define Y-fib (lambda (n)
                             ((lambda (fib)
@@ -163,12 +175,12 @@
   )
 
 (deftest list-as-streams
-  (ev '(define (cons x y)
-          (lambda (m) (m x y))))
-  (ev '(define (car z)
-         (z (lambda (x y) x))))
-  (ev '(define (cdr z)
-         (z (lambda (x y) y))))
+  ;; (ev '(define (cons x y)
+          ;; (lambda (m) (m x y))))
+  ;; (ev '(define (car z)
+         ;; (z (lambda (x y) x))))
+  ;; (ev '(define (cdr z)
+         ;; (z (lambda (x y) y))))
   (ev '(define (add-lists list1 list2)
          (cond ((null? list1) list2)
                ((null? list2) list1)
@@ -184,4 +196,8 @@
          (cons 1 (add-lists ones integers))))
   (is (= 18 (act '(list-ref integers 17))))
   (is (= 'a (act '(car '(a b c)))))
+  (is (= 2 (act '(car (cdr '(1 2 3))))))
 )
+
+(deftest lazy-list-printing
+  (is (= '(1 2 3 4 5 ...) (user-format (act '(cons 1 '(2 3 4 5 6 7 8 9)))))))

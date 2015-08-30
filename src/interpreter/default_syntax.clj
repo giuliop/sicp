@@ -28,6 +28,7 @@
                       :let* :let*
                       :letrec :letrec
                       :while :while
+                      :lazy-list :lazy-list
                       })
 
 (def primitives [

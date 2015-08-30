@@ -108,8 +108,8 @@
 
 (defmethod eval-exp :definition [exp *env*]
   (let [var (syn/definition-variable exp)
-        value (syn/definition-value exp)
-        value (eval-exp value *env*)]
+        value2 (syn/definition-value exp)
+        value (eval-exp value2 *env*)]
     (define-variable! var value *env*)
     (str var " : " (user-format value))))
 
@@ -205,8 +205,16 @@
 (defmethod eval-exp :procedure [exp *env*]
   (make-procedure (syn/lambda-params exp) (syn/lambda-body exp) *env*))
 
+(defn make-lazy-list [parameters body *env*]
+  (list 'lazy-list parameters body *env*))
+
+(defmethod eval-exp :lazy-list [exp *env*]
+  (make-lazy-list (syn/lambda-params exp) (syn/lambda-body exp) *env*))
+
 (defn compound-procedure? [p]
-  (and (list? p) (= 'procedure (first p))))
+  (and (list? p)
+       (or (= 'procedure (first p))
+           (= 'lazy-list (first p)))))
 
 (defn procedure-parameters [p] (second p))
 (defn procedure-body [p] (nth p 2))
@@ -237,15 +245,33 @@
         args (syn/operands exp)]
     (-apply op args *env*)))
 
-(defn user-format [object]
-  (cond (compound-procedure? object)
-          (list 'compound-procedure
-                (procedure-parameters object)
-                (procedure-body object)
-                '<procedure-env>)
-        (thunk? object)
-          (list 'thunk (thunk-exp object) '<thunk-env>')
-        :else object))
+(defn lazy-list? [object]
+  (and (syn/a-list? object)
+       (= 'lazy-list (first object))))
+
+(def max-lazy-list-depth-display 5)
+
+(defn lazy-list-view [object iterations-left]
+  (let [env (procedure-environment object)]
+    (if (>= iterations-left 0)
+      (conj (user-format (actual-value 'y env) iterations-left)
+            (user-format (actual-value 'x env)))
+      '(...))
+    ))
+
+(defn user-format
+  ([object] (user-format object max-lazy-list-depth-display))
+  ([object max-iterations]
+   (cond (compound-procedure? object)
+         (if (lazy-list? object)
+           (lazy-list-view object (dec max-iterations))
+           (list 'compound-procedure
+                 (procedure-parameters object)
+                 (procedure-body object)
+                 '<procedure-env>))
+         (thunk? object)
+         (list 'thunk (thunk-exp object) '<thunk-env>')
+         :else object)))
 
 (defn make-global-environment []
   (env/extend-with (syn/primitive-procedure-names)
@@ -254,7 +280,14 @@
 
 (defn reset-global-environment! []
   (alter-var-root #'the-global-environment
-                  (fn [_] (make-global-environment))))
+                  (fn [_] (make-global-environment)))
+  (eval-exp '(define (cons x y)
+               (lazy-list (m) (m x y))) the-global-environment)
+  (eval-exp '(define (car z)
+               (z (lambda (x y) x))) the-global-environment)
+  (eval-exp '(define (cdr z)
+               (z (lambda (x y) y))) the-global-environment)
+  nil)
 
 (defn scheme-eval-exp [input]
   (when-not (bound? #'the-global-environment)
