@@ -1,6 +1,8 @@
 ;;; CHAPTER 4
 
-(ns chapther4)
+(ns chapther4
+  (:require gws.util interpreter.main interpreter.analyze-then-execute
+            interpreter.lazy))
 
 ; 4.1
 
@@ -258,3 +260,76 @@
   )
 
 ; I like the text approach since it is actually lazy
+
+; 4.35
+
+(comment
+  (define (an-integer-between low high)
+    (require (<= low high)
+      (amb)
+      (amb low (an-integer-between (+ low 1) high))))
+  )
+
+; 4.36
+
+(comment
+  (define (pythagorean-triples-starting-from low)
+    (let ((high (an-integer-starting-from low))))
+      (a-pythagorean-triple-between low high)))
+
+; 4.38
+
+(defn valid? [baker cooper fletcher miller smith]
+  (and (= 5 (count (distinct [baker cooper fletcher miller smith])))
+       (not= baker 5)
+       (not= cooper 1)
+       (not= fletcher 5)
+       (not= fletcher 1)
+       (> miller cooper)
+       (> (Math/abs (- fletcher cooper)) 1)))
+
+(defn find-sol [pred]
+  (let [res (for [baker (range 1 6)
+                  cooper (range 1 6)
+                  fletcher (range 1 6)
+                  miller (range 1 6)
+                  smith (range 1 6)
+                  :when (pred baker cooper fletcher miller smith)]
+              {:baker baker
+               :cooper cooper
+               :fletcher fletcher
+               :miller miller
+               :smith smith})]
+    res))
+
+(defn f4-38 []
+  (count (find-sol valid?)))
+    ; 5 combinations
+
+; 4.39
+(defn valid-slower? [baker cooper fletcher miller smith]
+  (and (not= baker 5)
+       (not= cooper 1)
+       (not= fletcher 5)
+       (not= fletcher 1)
+       (> (Math/abs (- fletcher cooper)) 1)
+       (> (Math/abs (- fletcher smith)) 1)
+       (= 5 (count (distinct [baker cooper fletcher miller smith])))
+       (> miller cooper)
+       ))
+
+
+(defn valid-faster? [baker cooper fletcher miller smith]
+  (and (> miller cooper)
+       (> (Math/abs (- fletcher smith)) 1)
+       (> (Math/abs (- fletcher cooper)) 1)
+       (= 5 (count (distinct [baker cooper fletcher miller smith])))
+       (not= baker 5)
+       (not= cooper 1)
+       (not= fletcher 5)
+       (not= fletcher 1)
+       ))
+
+(defn f4-39 []
+  (gws.util/compare-times (find-sol valid-faster?) (find-sol valid-slower?)))
+  ; cannot make sense of it...
