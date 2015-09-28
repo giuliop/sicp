@@ -289,7 +289,7 @@
        (> (Math/abs (- fletcher cooper)) 1)))
 
 (defn find-sol [pred]
-  (let [res (for [baker (range 1 6)
+ (for [baker (range 1 6)
                   cooper (range 1 6)
                   fletcher (range 1 6)
                   miller (range 1 6)
@@ -299,8 +299,7 @@
                :cooper cooper
                :fletcher fletcher
                :miller miller
-               :smith smith})]
-    res))
+               :smith smith}))
 
 (defn f4-38 []
   (count (find-sol valid?)))
@@ -331,5 +330,46 @@
        ))
 
 (defn f4-39 []
-  (gws.util/compare-times (find-sol valid-faster?) (find-sol valid-slower?)))
+  (prn "faster...")
+  (#(time (find-sol valid-faster?)))
+  (prn "slower...")
+  (#(time (find-sol valid-slower?)))
+  ())
   ; cannot make sense of it...
+
+; 4.40
+  ;; sets before distinct floor requirement: 5^5 = 3125
+  ;; after: 5! = 120
+
+; 4.41
+
+(defn valid? [baker cooper fletcher miller smith]
+  (and (not= baker 5)
+       (not= cooper 1)
+       (not= fletcher 5)
+       (not= fletcher 1)
+       (> miller cooper)
+       (> (Math/abs (- fletcher smith)) 1)
+       (> (Math/abs (- fletcher cooper)) 1)))
+
+(def people [:baker :cooper :fletcher :miller :smith])
+
+(defn conj-to-all-positions [x xs]
+  (letfn [(f [n]
+             (let [[start end] (split-at n xs)]
+               (-> (vec start) (conj x) (concat (vec end)))))]
+    (map f (range (inc (count xs))))))
+
+(defn permutations [& xs]
+  (loop [res (list (list (first xs))), xs (next xs)]
+    (if (nil? xs)
+      res
+      (let [x (first xs)
+            res (mapcat (partial conj-to-all-positions x) res)]
+        (recur res (next xs))))))
+
+(defn find-sol-optimized [pred]
+  (->> (permutations 1 2 3 4 5)
+       (filter (partial apply pred))
+       (map (partial interleave people))
+       (map (partial apply hash-map))))
